@@ -1,0 +1,68 @@
+server:
+  port: 8094
+
+spring:
+  application:
+    name: auth-user
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8094
+  datasource:
+    url: jdbc:postgresql://localhost:5432/authdb
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    clean-disabled: false
+
+logging:
+  level:
+    root: INFO
+    com.authuser: DEBUG
+    org.springframework.security: INFO
+
+consent:
+  service:
+    url: http://localhost:8096/api/v1
+
+auth:
+  jwt:
+    issuer: http://localhost:8094
+    audience: https://mockbank/api
+    access-token-ttl: 30m
+    refresh-token-ttl: 7d
+    default-permissions: fdx:customers.read fdx:accounts.read fdx:accounts.write fdx:transactions.read fdx:bill.read fdx:bill.write fdx:payments.write admin:users.write admin:accounts admin:accounts.read admin:accounts.write
+  security:
+    max-failed-attempts: 5
+    lock-duration: 15m
+
+app:
+  demo-admin:
+    email: admin.demo@mockbank.local
+    password: ${DEMO_ADMIN_PASSWORD:Admin@12345}
+    customer-id: admin-root-0001
+  demo-user:
+    email: user.demo@mockbank.local
+    password: ${DEMO_USER_PASSWORD:User@12345}
+    customer-id: cust-demo-001
+
+auth0:
+  audience: https://mockbank/api
+  domain: ${AUTH0_DOMAIN:https://dev-wgk04dj5v68sbhre.us.auth0.com}
+  mgmt:
+    client-id: ${AUTH0_MGMT_CLIENT_ID:7m9h4UQsjOeVom5ysSt0t3TFLRgibBkT}
+    client-secret: ${AUTH0_MGMT_CLIENT_SECRET:XXXXXXX}
+    audience: ${AUTH0_MGMT_AUDIENCE:https://dev-wgk04dj5v68sbhre.us.auth0.com/api/v2/}

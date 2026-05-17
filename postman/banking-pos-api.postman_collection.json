@@ -1,0 +1,692 @@
+{
+  "info": {
+    "_postman_id": "banking-pos-api-collection",
+    "name": "Banking POS - All APIs",
+    "description": "REST APIs across banking-pos microservices.\n\n**Ports (local dev):**\n| Service | Port |\n|---------|------|\n| CustomerService | 8083 |\n| AccountService | 8084 |\n| PaymentOrchestrator | 8086 |\n| BillerService | 8088 |\n| EFTService | 8089 (skeleton, no endpoints) |\n| BillPayWorkerService | 8090 |\n| EFTWorkerService | 8091 (Kafka only) |\n| AuthUser | 8094 |\n| SettlementService | Kafka only, no REST |\n\n**Auth:** Most endpoints require `Authorization: Bearer {{access_token}}` issued by AuthUser (`/api/v1/auth/login`). Set `access_token` after login.\n\n**Idempotency:** Use header `Idempotency-Key` (UUID) for create account, holds, bill pay.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "customer_base",
+      "value": "http://localhost:8083"
+    },
+    {
+      "key": "account_base",
+      "value": "http://localhost:8084"
+    },
+    {
+      "key": "payment_base",
+      "value": "http://localhost:8086"
+    },
+    {
+      "key": "biller_base",
+      "value": "http://localhost:8088"
+    },
+    {
+      "key": "auth_base",
+      "value": "http://localhost:8094"
+    },
+    {
+      "key": "billpay_worker_base",
+      "value": "http://localhost:8090"
+    },
+    {
+      "key": "external_id",
+      "value": "cust-ext-001"
+    },
+    {
+      "key": "customer_id",
+      "value": "cust-ext-001"
+    },
+    {
+      "key": "account_id",
+      "value": "00000000-0000-0000-0000-000000000001"
+    },
+    {
+      "key": "hold_id",
+      "value": "00000000-0000-0000-0000-000000000002"
+    },
+    {
+      "key": "transaction_id",
+      "value": "00000000-0000-0000-0000-000000000003"
+    },
+    {
+      "key": "payment_id",
+      "value": "00000000-0000-0000-0000-000000000004"
+    },
+    {
+      "key": "biller_id",
+      "value": "00000000-0000-0000-0000-000000000005"
+    },
+    {
+      "key": "biller_ref_num",
+      "value": "BILLER-REF-001"
+    },
+    {
+      "key": "batch_id",
+      "value": "00000000-0000-0000-0000-000000000006"
+    },
+    {
+      "key": "idempotency_key",
+      "value": "idem-{{$guid}}"
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "login_email",
+      "value": "customer@example.com"
+    },
+    {
+      "key": "temporary_password",
+      "value": "Temp@12345"
+    }
+  ],
+  "item": [
+    {
+      "name": "Customer Service (:8083)",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{customer_base}}/api/v1/customers/health"
+          }
+        },
+        {
+          "name": "Create Customer",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Nguyen\",\n  \"lastName\": \"Van A\",\n  \"email\": \"nguyen.a@example.com\",\n  \"phone\": \"+84901234567\",\n  \"address\": \"123 Main St, Toronto, ON\",\n  \"externalId\": \"{{external_id}}\"\n}"
+            },
+            "url": "{{customer_base}}/api/v1/customers"
+          }
+        },
+        {
+          "name": "Get Customer by External ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{customer_base}}/api/v1/customers/{{external_id}}"
+          }
+        },
+        {
+          "name": "Exists by Email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customer_base}}/api/v1/customers/exists?email=nguyen.a@example.com",
+              "host": [
+                "{{customer_base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "exists"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "nguyen.a@example.com"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Exists by External ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{customer_base}}/api/v1/customers/{{external_id}}/exists"
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "If-Match",
+                "value": "1"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+84909998877\"\n}"
+            },
+            "url": "{{customer_base}}/api/v1/customers/{{external_id}}"
+          }
+        },
+        {
+          "name": "Update KYC Status (VERIFIED)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kycStatus\": \"VERIFIED\"\n}"
+            },
+            "url": "{{customer_base}}/api/v1/customers/{{external_id}}/kyc-status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Account Service (:8084)",
+      "item": [
+        {
+          "name": "Create Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotency_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"accountType\": \"CHEQUING\",\n  \"accountSubType\": \"PERSONAL\",\n  \"status\": \"ACTIVE\",\n  \"currency\": \"CAD\",\n  \"nickname\": \"Main chequing\",\n  \"displayName\": \"Everyday\",\n  \"openingBalance\": 1000.00\n}"
+            },
+            "url": "{{account_base}}/api/v1/accounts"
+          }
+        },
+        {
+          "name": "Get Account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{account_base}}/api/v1/accounts/{{account_id}}"
+          }
+        },
+        {
+          "name": "List Accounts (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{account_base}}/api/v1/accounts?status=ACTIVE&currency=CAD",
+              "host": [
+                "{{account_base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE"
+                },
+                {
+                  "key": "currency",
+                  "value": "CAD"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{account_base}}/api/v1/accounts/{{account_id}}/balance"
+          }
+        },
+        {
+          "name": "Get Accounts by Customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{account_base}}/api/v1/customer/{{customer_id}}/accounts"
+          }
+        },
+        {
+          "name": "Update Account Status",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{account_base}}/api/v1/accounts/{{account_id}}/status?status=FROZEN",
+              "host": [
+                "{{account_base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "{{account_id}}",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "FROZEN"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Account Owner",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{account_base}}/api/v1/accounts/{{account_id}}/owner"
+          }
+        },
+        {
+          "name": "Place Hold",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotency_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50.00,\n  \"reason\": \"BILLPAY\",\n  \"releaseAt\": null,\n  \"idempotencyKey\": null\n}"
+            },
+            "url": "{{account_base}}/api/v1/accounts/{{account_id}}/holds"
+          }
+        },
+        {
+          "name": "Release Hold",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{account_base}}/api/v1/accounts/{{account_id}}/holds/{{hold_id}}/release"
+          }
+        },
+        {
+          "name": "Credit Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "If-Match",
+                "value": "1"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.00,\n  \"reason\": \"deposit\"\n}"
+            },
+            "url": "{{account_base}}/api/v1/accounts/{{account_id}}/credit"
+          }
+        },
+        {
+          "name": "Debit Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "If-Match",
+                "value": "1"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 25.00,\n  \"reason\": \"payment\"\n}"
+            },
+            "url": "{{account_base}}/api/v1/accounts/{{account_id}}/debit"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions (:8084)",
+      "item": [
+        {
+          "name": "List Transactions by Account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{account_base}}/api/v1/accounts/{{account_id}}/transactions?limit=5&offset=0",
+              "host": [
+                "{{account_base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "{{account_id}}",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Transaction by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{account_base}}/api/v1/transactions/{{transaction_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment Orchestrator (:8086)",
+      "item": [
+        {
+          "name": "Bill Pay (async 202)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotency_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"debtorAccountId\": \"{{account_id}}\",\n  \"billerReferenceNumber\": \"{{biller_ref_num}}\",\n  \"invoiceReference\": \"INV-2025-001\",\n  \"executionDate\": \"2025-06-01\",\n  \"amount\": {\n    \"value\": 49.99,\n    \"currency\": \"CAD\"\n  },\n  \"note\": \"Electric bill\"\n}"
+            },
+            "url": "{{payment_base}}/api/v1/payments/billpay"
+          }
+        },
+        {
+          "name": "Get Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{payment_base}}/api/v1/payments/{{payment_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Biller Service (:8088)",
+      "item": [
+        {
+          "name": "Create Biller",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hydro One\",\n  \"referenceNumber\": \"{{biller_ref_num}}\",\n  \"category\": \"Electricity\"\n}"
+            },
+            "url": "{{biller_base}}/api/v1/billers"
+          }
+        },
+        {
+          "name": "List Billers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{biller_base}}/api/v1/billers?limit=10&offset=0",
+              "host": [
+                "{{biller_base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billers"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Biller",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{biller_base}}/api/v1/billers/{{biller_id}}"
+          }
+        },
+        {
+          "name": "Delete Biller",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{biller_base}}/api/v1/billers/{{biller_id}}"
+          }
+        },
+        {
+          "name": "Is Biller Active (registry)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{biller_base}}/api/v1/billers/{{biller_ref_num}}/active"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth User (:8094)",
+      "item": [
+        {
+          "name": "Create Internal User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{login_email}}\",\n  \"customerId\": \"{{external_id}}\",\n  \"temporaryPassword\": \"{{temporary_password}}\"\n}"
+            },
+            "url": "{{auth_base}}/api/v1/internal/users"
+          }
+        },
+        {
+          "name": "Login (save tokens)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{login_email}}\",\n  \"password\": \"{{temporary_password}}\"\n}"
+            },
+            "url": "{{auth_base}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"access_token\", data.access_token || \"\");",
+                  "pm.collectionVariables.set(\"refresh_token\", data.refresh_token || \"\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Access Token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{auth_base}}/api/v1/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"access_token\", data.access_token || \"\");",
+                  "pm.collectionVariables.set(\"refresh_token\", data.refresh_token || \"\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout (revoke refresh)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{auth_base}}/api/v1/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bill Pay Worker - Mock (:8090)",
+      "item": [
+        {
+          "name": "Simulate Central1 pain.002",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{billpay_worker_base}}/api/mock/central1/pain002/{{batch_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "EFT Service (:8089) - skeleton",
+      "description": "ExternalAccountController has no implemented endpoints yet. Base path: /api/v1/external-accounts",
+      "item": []
+    }
+  ]
+}

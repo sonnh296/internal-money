@@ -1,0 +1,85 @@
+server:
+  port: 8082
+
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${POS_BOOST_CONSUMER_GROUP:pos-boost-consumers-v1}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  autoconfigure:
+    exclude: []
+      # - org.redisson.spring.starter.RedissonAutoConfigurationV2 (Enabled)
+
+  # Redisson Configuration (Standard Starter Way)
+  redis:
+    redisson:
+      config:
+        singleServerConfig:
+          address: "${REDISSON_ADDRESS:redis://${spring.data.redis.host:localhost}:${spring.data.redis.port:6379}}"
+          dnsMonitoringInterval: 5000
+          connectionPoolSize: 500
+          connectionMinimumIdleSize: 50
+          # idleConnectionTimeout: 10000
+          # connectTimeout: 10000
+          # timeout: 3000
+
+logging:
+  level:
+    turbo.pos.boost: DEBUG
+
+# redis (default) | mysql-only — profile mysql-only bật sẵn trong application-mysql-only.yml
+app:
+  rewards:
+    mode: redis
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+      cors:
+        allowed-origins: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
+        allowed-methods: "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+        allowed-headers: "*"
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      redisNoLock:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - turbo.pos.boost.exception.RedisUnavailableException
+      redisLocking:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - turbo.pos.boost.exception.RedisUnavailableException

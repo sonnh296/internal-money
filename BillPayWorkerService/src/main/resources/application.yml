@@ -1,0 +1,58 @@
+server:
+  port: 8090
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8094
+  application:
+    name: billpay-worker-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/billpayworkerdb
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    clean-disabled: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${BILLPAY_WORKER_CONSUMER_GROUP:billpay-worker-v1}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+
+payments:
+  topics:
+    billpay-requested: billpay.requested
+    billpay-enqueued: billpay.enqueued
+    bill-batch-ready: bill.batch.ready
+
+  batch:
+    threshold: 1
+    
+    
+
+auth0:
+  audience: https://mockbank/api
+
+

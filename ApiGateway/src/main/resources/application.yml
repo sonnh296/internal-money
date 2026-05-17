@@ -1,0 +1,65 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      # Timeout chain: gateway > downstream service
+      httpclient:
+        connect-timeout: 10000
+        response-timeout: 30s
+      routes:
+        - id: auth-api
+          uri: ${AUTH_SERVICE_URL:http://localhost:8094}
+          predicates:
+            - Path=/auth-api/**
+          filters:
+            - StripPrefix=1
+        - id: customer-api
+          uri: ${CUSTOMER_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/customer-api/**
+          filters:
+            - StripPrefix=1
+        - id: account-api
+          uri: ${ACCOUNT_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/account-api/**
+          filters:
+            - StripPrefix=1
+        - id: payment-api
+          uri: ${PAYMENT_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/payment-api/**
+          filters:
+            - StripPrefix=1
+        - id: biller-api
+          uri: ${BILLER_SERVICE_URL:http://localhost:8088}
+          predicates:
+            - Path=/biller-api/**
+          filters:
+            - StripPrefix=1
+        - id: pos-api
+          uri: ${POS_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/pos-api/**
+          filters:
+            - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true

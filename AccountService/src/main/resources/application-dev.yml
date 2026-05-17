@@ -1,0 +1,75 @@
+server:
+  port: 8084
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8094
+  application:
+    name: account-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/accountsdb
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  cloud:
+    openfeign:
+      client:
+        config:
+          customerClient:
+            connect-timeout: 2000
+            read-timeout: 2000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Cho phép baseline khi DB đã tồn tại (migrate từ ddl-auto:update sang Flyway)
+    baseline-on-migrate: true
+    baseline-version: 0
+    clean-disabled: false
+
+resilience4j:
+  ratelimiter:
+    instances:
+      transfer:
+        limit-for-period: 5
+        limit-refresh-period: 1m
+        timeout-duration: 0s
+  circuitbreaker:
+    instances:
+      customerClient:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      customerClient:
+        timeout-duration: 2s
+logging:
+  level:
+    org.springframework.security: DEBUG
+    
+account:
+  service:
+    url: http://localhost:8084
+    
+
+customer:
+  service:
+    url: http://localhost:8083
+
+auth0:
+  audience: https://mockbank/api
+
+
+
