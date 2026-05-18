@@ -21,9 +21,18 @@ public class IdempotencyInterceptor implements HandlerInterceptor {
     private final IdempotencyRecordRepository idempotencyRepo;
     private final ObjectMapper objectMapper;
 
+    /** POST release hold: idempotent by hold state; M2M clients do not send Idempotency-Key. */
+    private static boolean isIdempotencyExempt(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path != null && path.matches(".*/holds/[^/]+/release$");
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+        if (isIdempotencyExempt(request)) {
             return true;
         }
 
@@ -66,14 +75,19 @@ public class IdempotencyInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
+            throws Exception {
+        if (!"POST".equalsIgnoreCase(request.getMethod()) || isIdempotencyExempt(request)) {
             return;
         }
 
         String idempotencyKey = request.getHeader("Idempotency-Key");
-        if (idempotencyKey == null || idempotencyKey.isBlank() || response.getStatus() >= 400) {
-            // Không lưu cache nếu request lỗi hoặc không có key
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return;
+        }
+
+        if (ex != null || response.getStatus() >= 400) {
+            clearProcessingRecord(idempotencyKey);
             return;
         }
 
@@ -90,8 +104,18 @@ public class IdempotencyInterceptor implements HandlerInterceptor {
                 });
             } catch (Exception e) {
                 log.error("Failed to save idempotency record: {}", e.getMessage(), e);
+                clearProcessingRecord(idempotencyKey);
                 throw new RuntimeException("Failed to save idempotency record", e);
             }
         }
+    }
+
+    private void clearProcessingRecord(String idempotencyKey) {
+        idempotencyRepo.findById(idempotencyKey).ifPresent(record -> {
+            if ("PROCESSING".equals(record.getStatus())) {
+                idempotencyRepo.delete(record);
+                log.debug("Cleared idempotency PROCESSING record for key: {}", idempotencyKey);
+            }
+        });
     }
 }

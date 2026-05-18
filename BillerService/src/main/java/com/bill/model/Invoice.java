@@ -49,7 +49,7 @@ public class Invoice {
     @Column(name = "biller_reference_number", nullable = false, length = 64)
     private String billerReferenceNumber;
 
-    @Column(nullable = false, precision = 18, scale = 2)
+    @Column(nullable = false, precision = 18, scale = 4)
     private BigDecimal amount;
 
     @Builder.Default

@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -47,7 +48,6 @@ public class AccountService {
 	private final AccountMapper mapper;
 	private final TransactionService transactionService;
 	private final TransactionMapper transactionMapper;
-	private final IdempotencyRecordRepository idempotencyRepo;
 
 	@Value("${account.transfer.max-amount:500000000}")
 	private BigDecimal maxTransferAmount;
@@ -434,12 +434,21 @@ public class AccountService {
 		if (r.amount().compareTo(maxTransferAmount) > 0) {
 			throw new IllegalArgumentException("Transfer amount exceeds maximum limit of " + maxTransferAmount);
 		}
+		String targetAccountNumber = r.toAccountNumber().trim();
+		Account targetPreview = accountRepo.findByAccountNumber(targetAccountNumber)
+				.orElseThrow(() -> new com.commons.exception.AccountNotFoundException(
+						"Destination account not found: " + targetAccountNumber));
+		Account fromPreview = accountRepo.findById(r.fromAccountId())
+				.orElseThrow(() -> new com.commons.exception.AccountNotFoundException(r.fromAccountId()));
+		String toLabel = resolveRecipientDisplayName(targetPreview);
+		String fromLabel = resolveRecipientDisplayName(fromPreview);
 		return withOptimisticRetry(() -> transactionTemplate.execute(
-				status -> transferInTransaction(r, idempotencyKey)));
+				status -> transferInTransaction(r, idempotencyKey, toLabel, fromLabel)));
 	}
 
 	@Transactional(propagation = Propagation.REQUIRED)
-	InternalTransferResponse transferInTransaction(InternalTransferRequest request, String idempotencyKey) {
+	InternalTransferResponse transferInTransaction(InternalTransferRequest request, String idempotencyKey,
+			String toLabel, String fromLabel) {
 		if (request.fromAccountId() == null) {
 			throw new com.commons.exception.BadRequestException("Source account id is required");
 		}
@@ -509,8 +518,6 @@ public class AccountService {
 		Account toSaved = accountRepo.saveAndFlush(to);
 		OffsetDateTime occurredAt = OffsetDateTime.now(ZoneOffset.UTC);
 
-		String toLabel = resolveRecipientDisplayName(to);
-		String fromLabel = resolveRecipientDisplayName(from);
 		emitTransaction(fromSaved, "TRANSFER_DEBIT", request.amount(), request.reason(), true, fromSaved.getBalance(),
 				debitFingerprint, transferId, occurredAt, "OUT", toLabel, to.getAccountNumber());
 		emitTransaction(toSaved, "TRANSFER_CREDIT", request.amount(), request.reason(), true, toSaved.getBalance(),

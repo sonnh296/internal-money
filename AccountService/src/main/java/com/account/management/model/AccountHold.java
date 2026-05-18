@@ -29,7 +29,7 @@ public class AccountHold {
     @Column(nullable = false)
     private UUID accountId;
 
-    @Column(precision = 19, scale = 2, nullable = false)
+    @Column(precision = 19, scale = 4, nullable = false)
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)

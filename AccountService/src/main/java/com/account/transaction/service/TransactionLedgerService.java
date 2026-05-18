@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.account.transaction.model.TransactionLedgerEntry;
-import com.account.model.TransactionLedgerEntry.EntryType;
+import com.account.transaction.model.TransactionLedgerEntry.EntryType;
 import com.account.transaction.repository.TransactionLedgerRepository;
 
 import lombok.RequiredArgsConstructor;

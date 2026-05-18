@@ -47,7 +47,7 @@ public class Transaction {
     private TransactionStatus status;
 
     /** Signed amount; for DEBIT we still store positive amount (business sign is in type). */
-    @Column(precision = 19, scale = 2, nullable = false)
+    @Column(precision = 19, scale = 4, nullable = false)
     private BigDecimal amount;
 
 
@@ -71,7 +71,7 @@ public class Transaction {
     private String referenceId;
 
     /** For postings (DEBIT/CREDIT) only; null for holds. */
-    @Column(precision = 19, scale = 2)
+    @Column(precision = 19, scale = 4)
     private BigDecimal balanceAfter;
 
 

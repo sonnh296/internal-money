@@ -42,7 +42,7 @@ public class Payment {
   @Column(name="execution_date", nullable=false)
   private LocalDate executionDate; // Today or future; cutoff rules handled elsewhere
 
-  @Column(name="amount_value", precision=18, scale=2, nullable=false)
+  @Column(name="amount_value", precision=18, scale=4, nullable=false)
   private BigDecimal amountValue; // Decimal amount in minor precision
 
   @Column(name="amount_ccy", length=3, nullable=false)

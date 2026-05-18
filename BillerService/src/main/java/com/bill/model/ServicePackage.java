@@ -44,7 +44,7 @@ public class ServicePackage {
     @Column(name = "reference_number", nullable = false, unique = true)
     private String referenceNumber;
 
-    @Column(name = "monthly_amount", nullable = false, precision = 18, scale = 2)
+    @Column(name = "monthly_amount", nullable = false, precision = 18, scale = 4)
     private BigDecimal monthlyAmount;
 
     @Builder.Default
