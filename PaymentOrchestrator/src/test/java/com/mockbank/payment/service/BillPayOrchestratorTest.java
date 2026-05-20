@@ -22,7 +22,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mockbank.commons.security.CurrentUser;
 import com.mockbank.payment.client.AccountClient;
+import com.mockbank.payment.client.AccountM2MClient;
 import com.mockbank.payment.dto.AmountDto;
 import com.mockbank.payment.dto.BillPayRequest;
 import com.mockbank.payment.repo.OutboxRepo;
@@ -37,6 +39,8 @@ class BillPayOrchestratorTest {
 
     private BillPayValidator validator;
     private AccountClient accountClient;
+    private AccountM2MClient accountM2MClient;
+    private CurrentUser currentUser;
     private PaymentRepo paymentRepo;
     private OutboxRepo outboxRepo;
     private TransactionTemplate paymentTransactionTemplate;
@@ -47,6 +51,8 @@ class BillPayOrchestratorTest {
     void setUp() {
         validator = Mockito.mock(BillPayValidator.class);
         accountClient = Mockito.mock(AccountClient.class);
+        accountM2MClient = Mockito.mock(AccountM2MClient.class);
+        currentUser = Mockito.mock(CurrentUser.class);
         paymentRepo = Mockito.mock(PaymentRepo.class);
         outboxRepo = Mockito.mock(OutboxRepo.class);
         paymentTransactionTemplate = Mockito.mock(TransactionTemplate.class);
@@ -60,6 +66,8 @@ class BillPayOrchestratorTest {
         orchestrator = new BillPayOrchestrator(
                 validator,
                 accountClient,
+                accountM2MClient,
+                currentUser,
                 paymentRepo,
                 outboxRepo,
                 new ObjectMapper(),
@@ -76,8 +84,7 @@ class BillPayOrchestratorTest {
                 "INV-001",
                 LocalDate.now().plusDays(1).toString(),
                 new AmountDto(new java.math.BigDecimal("100.00"), "VND"),
-                "test",
-                0L);
+                "test");
 
         when(paymentRepo.findByIdempotencyKey("idem-001")).thenReturn(Optional.empty());
         when(accountClient.placeHold(eq(accountId), eq("idem-001"), any()))

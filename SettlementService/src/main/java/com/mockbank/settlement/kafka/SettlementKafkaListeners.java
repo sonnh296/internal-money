@@ -10,7 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.DltHandler;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.annotation.RetryableTopic;
+import org.springframework.kafka.retrytopic.DltStrategy;
 import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.retry.annotation.Backoff;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +25,10 @@ public class SettlementKafkaListeners {
     private final SettlementProcessor settlementProcessor;
     private final ObjectMapper objectMapper; 
 
+    @RetryableTopic(
+            attempts = "4",
+            backoff = @Backoff(delay = 1000, multiplier = 2.0),
+            dltStrategy = DltStrategy.FAIL_ON_ERROR)
     @KafkaListener(topics = "bill.batch.ready", groupId = "settlement-service")
     public void onBatchReady(String payload) {
         try {
@@ -36,6 +43,10 @@ public class SettlementKafkaListeners {
         }
     }
 
+    @RetryableTopic(
+            attempts = "4",
+            backoff = @Backoff(delay = 1000, multiplier = 2.0),
+            dltStrategy = DltStrategy.FAIL_ON_ERROR)
     @KafkaListener(topics = "bill.batch.retry", groupId = "settlement-service")
     public void onBatchRetry(String payload) {
         try {
@@ -50,6 +61,10 @@ public class SettlementKafkaListeners {
         }
     }
 
+    @RetryableTopic(
+            attempts = "4",
+            backoff = @Backoff(delay = 1000, multiplier = 2.0),
+            dltStrategy = DltStrategy.FAIL_ON_ERROR)
     @KafkaListener(topics = "central1.pain002", groupId = "settlement-service")
     public void onPain002(String payload) {
         try {

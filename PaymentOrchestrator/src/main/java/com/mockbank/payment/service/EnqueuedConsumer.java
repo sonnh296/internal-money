@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mockbank.payment.domain.Payment;
 import com.mockbank.payment.domain.PaymentState;
 import com.mockbank.payment.domain.ProcessedEvent;
+import com.mockbank.commons.dto.events.EventSchemaSupport;
 import com.mockbank.commons.dto.events.billpay.*;
 import com.mockbank.payment.repo.PaymentRepo;
 import com.mockbank.payment.repo.ProcessedEventRepo;
@@ -12,7 +13,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.kafka.annotation.DltHandler;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.annotation.RetryableTopic;
+import org.springframework.kafka.retrytopic.DltStrategy;
 import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.retry.annotation.Backoff;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +32,15 @@ public class EnqueuedConsumer {
   private final ProcessedEventRepo processed;
   private final ObjectMapper om;
 
-  @KafkaListener(topics="billpay.enqueued", groupId="payment-api")
+  @RetryableTopic(
+      attempts = "4",
+      backoff = @Backoff(delay = 1000, multiplier = 2.0),
+      dltStrategy = DltStrategy.FAIL_ON_ERROR)
+  @KafkaListener(topics = "${payments.topics.billpay-enqueued:billpay.enqueued}", groupId = "payment-api")
   @Transactional
   public void onMessage(String message) throws Exception {
     var evt = om.readValue(message, BillPayEnqueued.class);
+    EventSchemaSupport.requireVersion1(evt.getSchemaVersion(), "BillPayEnqueued");
     if (processed.existsByHandlerAndEventId("enqueued", evt.getEventId())) return;
 
     Payment p = paymentRepo.findById(evt.getPaymentId()).orElse(null);

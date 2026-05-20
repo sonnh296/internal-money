@@ -10,6 +10,10 @@ import com.mockbank.biller.repository.InvoiceRepository;
 import com.mockbank.biller.repository.ServicePackageRepository;
 import com.mockbank.biller.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -99,12 +103,25 @@ public class InvoiceService {
     }
 
     public List<InvoiceResponse> listPendingForCustomer(String customerId) {
-        return invoiceRepo.findByCustomerIdAndStatus(customerId, "PENDING").stream()
+        return listPendingForCustomer(customerId, 50, 0).getContent();
+    }
+
+    public Page<InvoiceResponse> listPendingForCustomer(String customerId, int limit, int offset) {
+        int safeLimit = Math.min(Math.max(limit, 1), 100);
+        int pageIndex = Math.max(offset, 0) / safeLimit;
+        Pageable pageable = PageRequest.of(pageIndex, safeLimit, Sort.by(Sort.Direction.DESC, "dueDate"));
+        return invoiceRepo.findByCustomerIdAndStatus(customerId, "PENDING", pageable)
                 .map(inv -> {
                     ServicePackage pkg = packageRepo.findById(inv.getPackageId()).orElse(null);
                     return toDto(inv, pkg);
-                })
-                .collect(Collectors.toList());
+                });
+    }
+
+    public InvoiceResponse getById(UUID id) {
+        Invoice inv = invoiceRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found"));
+        ServicePackage pkg = packageRepo.findById(inv.getPackageId()).orElse(null);
+        return toDto(inv, pkg);
     }
 
     public InvoiceResponse markPaid(UUID id) {

@@ -142,6 +142,51 @@ class StatusConsumerTest {
         verify(paymentRepo).save(Mockito.argThat(p -> p.getState() == PaymentState.FAILED));
         verify(compensation).releaseHoldAfterFailure(accountId, paymentId);
         verify(billerInvoiceClient, never()).markPaid(any());
+        verify(processedEventRepo, never()).save(any(ProcessedEvent.class));
+    }
+
+    @Test
+    void markPaidFailureAfterCaptureShouldNotReleaseHold() throws Exception {
+        UUID paymentId = UUID.randomUUID();
+        UUID accountId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID invoiceId = UUID.randomUUID();
+
+        Payment payment = Payment.builder()
+                .paymentId(paymentId)
+                .debtorAccountId(accountId)
+                .invoiceReference(invoiceId.toString())
+                .amountValue(new BigDecimal("50.00"))
+                .amountCcy("CAD")
+                .executionDate(LocalDate.now())
+                .state(PaymentState.FUNDS_HELD)
+                .reason("ok")
+                .idempotencyKey("idem-mark-fail")
+                .build();
+
+        BillpayStatusEvent event = new BillpayStatusEvent(eventId, paymentId, UUID.randomUUID(), "POSTED", "ok",
+                OffsetDateTime.now());
+        String message = objectMapper.writeValueAsString(event);
+
+        when(processedEventRepo.existsByHandlerAndEventId("status", eventId.toString())).thenReturn(false);
+        when(paymentRepo.findById(paymentId)).thenReturn(Optional.of(payment), Optional.of(payment), Optional.of(payment));
+        when(accountM2MClient.captureHoldAndDebit(eq(accountId), eq(paymentId), eq(paymentId + ":DEBIT"),
+                any(PostingRequest.class)))
+                .thenReturn(new AccountResponse(accountId, "cust-123", "900000001", null, null, null, "CAD",
+                        null, null, new BigDecimal("50.00"), null, 1, null, null));
+        Mockito.doThrow(new RuntimeException("biller down")).when(billerInvoiceClient).markPaid(invoiceId);
+
+        try {
+            consumer.onMessage(message);
+        } catch (RuntimeException ignored) {
+        }
+
+        verify(accountM2MClient).captureHoldAndDebit(eq(accountId), eq(paymentId), eq(paymentId + ":DEBIT"),
+                any(PostingRequest.class));
+        verify(billerInvoiceClient).markPaid(invoiceId);
+        verify(compensation, never()).releaseHoldAfterFailure(any(), any());
+        verify(paymentRepo, never()).save(Mockito.argThat(p -> p.getState() == PaymentState.FAILED));
+        verify(processedEventRepo, never()).save(any(ProcessedEvent.class));
     }
 
     @Test

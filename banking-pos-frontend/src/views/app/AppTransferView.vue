@@ -107,7 +107,7 @@ async function submitTransfer() {
           amount: form.amount,
           reason: form.reason.trim(),
         },
-        `transfer-${Date.now()}`,
+        `transfer-${myAccount.value!.id}-${form.toAccountNumber.trim()}-${form.amount}`,
       ),
     { successToast: "Chuyển khoản thành công." },
   );

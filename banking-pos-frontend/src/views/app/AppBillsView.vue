@@ -49,7 +49,14 @@ async function load() {
     run('Lấy hóa đơn', () => listMyInvoicesApi(), { silent: true }),
     run('Lấy tài khoản', () => getMyAccountApi(), { silent: true }).catch(() => ({ data: null }))
   ])
-  invoices.value = Array.isArray(invoiceResp.data) ? (invoiceResp.data as Invoice[]) : []
+  const invoiceData = invoiceResp.data as Invoice[] | { content?: Invoice[] }
+  if (Array.isArray(invoiceData)) {
+    invoices.value = invoiceData
+  } else if (invoiceData && Array.isArray(invoiceData.content)) {
+    invoices.value = invoiceData.content
+  } else {
+    invoices.value = []
+  }
   myAccount.value = accountResp.data as AccountResponse | null
   if (!selectedInvoiceId.value && pendingInvoices.value[0]) {
     selectedInvoiceId.value = pendingInvoices.value[0].id
@@ -96,7 +103,7 @@ async function paySelected() {
           amount: { value: Number(inv.amount), currency: inv.currency || myAccount.value!.currency || 'VND' },
           note: `Pay invoice ${inv.id}`
         },
-        `billpay-invoice-${inv.id}-${Date.now()}`
+        `billpay-invoice-${inv.id}`
       )
     )
     const paymentId = String((resp.data as { paymentId?: string })?.paymentId ?? '')

@@ -2,6 +2,7 @@ package com.mockbank.payment.service;
 
 import com.mockbank.payment.domain.Outbox;
 import com.mockbank.payment.repo.OutboxRepo;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -10,18 +11,26 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OutboxPublisher {
 
+  private static final long SEND_TIMEOUT_SECONDS = 10;
+
   private final OutboxRepo outboxRepo;
   private final KafkaTemplate<String, String> kafka;
 
-  /**
-   * Đánh dấu SENDING trong TX trước khi gửi Kafka — giảm duplicate khi crash giữa send và update.
-   */
+  @PostConstruct
+  void recoverStaleSendingRows() {
+    int reset = outboxRepo.resetStaleSendingToPending();
+    if (reset > 0) {
+      log.warn("Reset {} outbox rows from SENDING to PENDING on startup", reset);
+    }
+  }
+
   @Scheduled(fixedDelayString = "${outbox.publish.fixedDelayMs:5000}")
   public void publish() {
     List<Outbox> batch = outboxRepo.findTop200ByStateOrderByIdAsc("PENDING");
@@ -30,20 +39,21 @@ public class OutboxPublisher {
       if (!markSending(row.getId())) {
         continue;
       }
-      final Long rowId = row.getId();
-      final String topic = row.getTopic();
-      final String key = row.getKey().toString();
+      publishRow(row);
+    }
+  }
 
-      kafka.send(topic, key, row.getPayloadJson())
-          .whenComplete((result, ex) -> {
-            if (ex == null) {
-              outboxRepo.updateState(rowId, "PUBLISHED");
-              log.debug("Outbox published id={} topic={} key={}", rowId, topic, key);
-            } else {
-              outboxRepo.updateState(rowId, "PENDING");
-              log.error("Outbox publish failed id={} topic={} key={}", rowId, topic, key, ex);
-            }
-          });
+  private void publishRow(Outbox row) {
+    final Long rowId = row.getId();
+    final String topic = row.getTopic();
+    final String key = row.getKey().toString();
+    try {
+      kafka.send(topic, key, row.getPayloadJson()).get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      outboxRepo.updateState(rowId, "PUBLISHED");
+      log.debug("Outbox published id={} topic={} key={}", rowId, topic, key);
+    } catch (Exception ex) {
+      outboxRepo.updateState(rowId, "PENDING");
+      log.error("Outbox publish failed id={} topic={} key={}", rowId, topic, key, ex);
     }
   }
 

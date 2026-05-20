@@ -29,6 +29,9 @@ public class SchedulingConfig {
         }
 
         toExpire.forEach(h -> {
+            if (h.getReason() != null && "BILLPAY".equalsIgnoreCase(h.getReason().trim())) {
+                return;
+            }
             h.setStatus(HoldStatus.EXPIRED);
             holdRepo.save(h);
         });

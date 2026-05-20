@@ -18,6 +18,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -43,6 +44,9 @@ public class BillPayOrchestrator {
   private final TransactionTemplate paymentTransactionTemplate;
   private final BillPayCompensationService compensation;
 
+  @Value("${payments.topics.billpay-requested:billpay.requested}")
+  private String billpayRequestedTopic;
+
   /** Không bọc HTTP/Feign trong @Transactional — chỉ persist payment + outbox trong TX ngắn. */
   public PaymentAcceptedResponse acceptBillPay(BillPayRequest req, String idemKey) {
     var existing = paymentRepo.findByIdempotencyKey(idemKey);
@@ -52,6 +56,7 @@ public class BillPayOrchestrator {
     }
 
     validator.validate(req);
+    ensureDebtorOwnership(req.debtorAccountId());
 
     BigDecimal holdAmount = req.amount().value();
 
@@ -115,7 +120,7 @@ public class BillPayOrchestrator {
         .build();
 
     outboxRepo.save(Outbox.builder()
-        .topic("billpay.requested")
+        .topic(billpayRequestedTopic)
         .key(holdId)
         .payloadJson(write(evt))
         .state("PENDING")
@@ -133,16 +138,22 @@ public class BillPayOrchestrator {
 
   public Payment view(UUID paymentId) {
     Payment p = paymentRepo.findById(paymentId).orElseThrow();
-    
-    // Validate ownership
-    String ownerCustomerId = accountM2MClient.getOwner(p.getDebtorAccountId()).getCustomerId();
-    String currentCustomerId = currentUser.customerId().orElse("");
-    
-    if (!ownerCustomerId.equals(currentCustomerId) && !currentUser.hasScope("admin:payments.read")) {
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to view this payment");
-    }
-    
+    ensureDebtorOwnership(p.getDebtorAccountId());
     return p;
+  }
+
+  private void ensureDebtorOwnership(UUID debtorAccountId) {
+    if (currentUser.hasScope("admin:payments.read")
+        || currentUser.hasScope("admin:payments.write")
+        || currentUser.hasScope("admin:accounts")) {
+      return;
+    }
+    String ownerCustomerId = accountM2MClient.getOwner(debtorAccountId).getCustomerId();
+    String currentCustomerId = currentUser.customerId()
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized"));
+    if (!ownerCustomerId.equals(currentCustomerId)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to use this account");
+    }
   }
 
   private PaymentAcceptedResponse acceptedResponse(Payment p) {

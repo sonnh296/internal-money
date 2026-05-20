@@ -59,6 +59,8 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
     producer:
+      acks: all
+      enable-idempotence: true
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
@@ -78,6 +80,9 @@ spring:
             readTimeout: 10000
 
 payments:
+  recovery:
+    capturing-timeout-minutes: 30
+    fixed-delay-ms: 300000
   topics:
     billpay-requested: billpay.requested
     billpay-enqueued: billpay.enqueued

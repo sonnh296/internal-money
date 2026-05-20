@@ -25,4 +25,9 @@ public interface OutboxRepo extends JpaRepository<Outbox, Long> {
   @Query("UPDATE Outbox o SET o.state = :newState WHERE o.id = :id AND o.state = :expectedState")
   int markStateIfCurrent(@Param("id") Long id, @Param("expectedState") String expectedState,
       @Param("newState") String newState);
+
+  @Modifying
+  @Transactional
+  @Query("UPDATE Outbox o SET o.state = 'PENDING' WHERE o.state = 'SENDING'")
+  int resetStaleSendingToPending();
 }

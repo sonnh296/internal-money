@@ -1,5 +1,6 @@
 package com.mockbank.billpay.worker.service;
 
+import com.mockbank.commons.dto.events.EventSchemaSupport;
 import com.mockbank.billpay.worker.domain.Batch;
 import com.mockbank.billpay.worker.domain.BatchLine;
 import com.mockbank.commons.dto.events.billpay.*;
@@ -42,6 +43,7 @@ public class BillPayWorkerService {
 
     @Transactional
     public void handleRequested(BillPayRequested evt) {
+        EventSchemaSupport.requireVersion1(evt.getSchemaVersion(), "BillPayRequested");
         log.info("Handling BillPayRequested paymentId={} correlationId={}", evt.getPaymentId(), evt.getCorrelationId());
 
         // 1) find or create OPEN batch

@@ -8,6 +8,7 @@ import com.mockbank.biller.dto.InvoiceResponse;
 import jakarta.validation.Valid;
 import com.mockbank.biller.service.InvoiceService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -39,9 +40,11 @@ public class InvoiceController {
 
     @GetMapping("/me")
     @PreAuthorize("hasAuthority('SCOPE_fdx:bill.read')")
-    public ResponseEntity<List<InvoiceResponse>> listMine() {
+    public ResponseEntity<Page<InvoiceResponse>> listMine(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
         String customerId = currentUser.customerId().get();
-        return ResponseEntity.ok(invoiceService.listPendingForCustomer(customerId));
+        return ResponseEntity.ok(invoiceService.listPendingForCustomer(customerId, limit, offset));
     }
 
     @PatchMapping("/{id}/paid")

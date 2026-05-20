@@ -16,6 +16,12 @@ public class InternalInvoiceController {
 
     private final InvoiceService invoiceService;
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('SCOPE_admin:accounts','SCOPE_admin:accounts.write')")
+    public ResponseEntity<InvoiceResponse> getById(@PathVariable UUID id) {
+        return ResponseEntity.ok(invoiceService.getById(id));
+    }
+
     @PatchMapping("/{id}/paid")
     @PreAuthorize("hasAnyAuthority('SCOPE_admin:accounts','SCOPE_admin:accounts.write')")
     public ResponseEntity<InvoiceResponse> markPaid(@PathVariable UUID id) {

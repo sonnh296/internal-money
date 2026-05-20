@@ -34,6 +34,8 @@ spring:
     listener:
       ack-mode: record
     producer:
+      acks: all
+      enable-idempotence: true
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 

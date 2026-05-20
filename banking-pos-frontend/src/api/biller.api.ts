@@ -99,8 +99,8 @@ export function listAllInvoicesApi() {
   return client.get('/api/v1/invoices')
 }
 
-export function listMyInvoicesApi() {
-  return client.get('/api/v1/invoices/me')
+export function listMyInvoicesApi(limit = 50, offset = 0) {
+  return client.get('/api/v1/invoices/me', { params: { limit, offset } })
 }
 
 export function markInvoicePaidApi(id: string) {

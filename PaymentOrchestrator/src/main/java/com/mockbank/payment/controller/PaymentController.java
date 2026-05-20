@@ -2,7 +2,7 @@ package com.mockbank.payment.controller;
 
 import com.mockbank.payment.dto.BillPayRequest;
 import com.mockbank.payment.dto.PaymentAcceptedResponse;
-import com.mockbank.payment.domain.Payment;
+import com.mockbank.payment.dto.PaymentResponse;
 import com.mockbank.payment.service.BillPayOrchestrator;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import jakarta.validation.Valid;
@@ -32,7 +32,7 @@ public class PaymentController {
   }
 
   @GetMapping("/payments/{paymentId}")
-  public ResponseEntity<Payment> get(@PathVariable UUID paymentId) {
-    return ResponseEntity.ok(billPayOrchestrator.view(paymentId));
+  public ResponseEntity<PaymentResponse> get(@PathVariable UUID paymentId) {
+    return ResponseEntity.ok(PaymentResponse.from(billPayOrchestrator.view(paymentId)));
   }
 }

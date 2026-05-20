@@ -12,9 +12,13 @@ import com.mockbank.payment.repo.PaymentRepo;
 import com.mockbank.payment.repo.ProcessedEventRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.annotation.RetryableTopic;
+import org.springframework.kafka.retrytopic.DltStrategy;
 import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.retry.annotation.Backoff;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -39,6 +43,10 @@ public class StatusConsumer {
    * Saga POSTED: (1) TX → CAPTURING (2) HTTP capture + mark invoice (3) TX → POSTED + outbox.
    * Không debit trước khi ghi nhận CAPTURING — tránh tiền đã trừ mà payment vẫn FUNDS_HELD.
    */
+  @RetryableTopic(
+      attempts = "4",
+      backoff = @Backoff(delay = 1000, multiplier = 2.0),
+      dltStrategy = DltStrategy.FAIL_ON_ERROR)
   @KafkaListener(topics="${payments.topics.billpay-status:billpay.status}", groupId="payment-api")
   public void onMessage(String message) throws Exception {
     var evt = om.readValue(message, BillpayStatusEvent.class);
@@ -75,12 +83,12 @@ public class StatusConsumer {
 
     try {
       captureHoldWithCb(p.getDebtorAccountId(), p.getPaymentId(), captureIdempotencyKey, posting);
-      markInvoicePaid(p);
     } catch (Exception ex) {
       compensateFailedCapture(p, evt, ex);
       throw ex;
     }
 
+    markInvoicePaid(p);
     finalizePosted(evt, p);
   }
 
@@ -167,11 +175,6 @@ public class StatusConsumer {
         fresh.setUpdatedAt(OffsetDateTime.now());
         paymentRepo.save(fresh);
       }
-      if (!processed.existsByHandlerAndEventId("status", evt.eventId().toString())) {
-        processed.save(ProcessedEvent.builder()
-            .handler("status").eventId(evt.eventId().toString())
-            .processedAt(OffsetDateTime.now()).build());
-      }
       return null;
     });
     compensation.releaseHoldAfterFailure(p.getDebtorAccountId(), p.getPaymentId());
@@ -227,6 +230,14 @@ public class StatusConsumer {
       log.info("Marked invoice {} as PAID for paymentId={}", invoiceId, p.getPaymentId());
     } catch (IllegalArgumentException e) {
       log.warn("Invalid invoice reference on payment {}: {}", p.getPaymentId(), p.getInvoiceReference());
+    } catch (FeignException e) {
+      if (e.status() == 409) {
+        log.info("Invoice {} already PAID for paymentId={}", p.getInvoiceReference(), p.getPaymentId());
+        return;
+      }
+      log.error("Failed to mark invoice {} as PAID for payment {}: {}",
+          p.getInvoiceReference(), p.getPaymentId(), e.getMessage());
+      throw e;
     } catch (Exception e) {
       log.error("Failed to mark invoice {} as PAID for payment {}: {}",
           p.getInvoiceReference(), p.getPaymentId(), e.getMessage());

@@ -8,7 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.DltHandler;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.annotation.RetryableTopic;
+import org.springframework.kafka.retrytopic.DltStrategy;
 import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.retry.annotation.Backoff;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +23,10 @@ public class BillPayRequestedListener {
     private final BillPayWorkerService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @RetryableTopic(
+            attempts = "4",
+            backoff = @Backoff(delay = 1000, multiplier = 2.0),
+            dltStrategy = DltStrategy.FAIL_ON_ERROR)
     @KafkaListener(
             topics = "${payments.topics.billpay-requested:billpay.requested}",
             groupId = "${spring.kafka.consumer.group-id:billpay-worker-v1}"

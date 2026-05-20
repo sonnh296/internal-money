@@ -30,8 +30,8 @@ spring:
       INDENT_OUTPUT: false
 
 cors:
-  allowed-origins: "*"
-  allowed-methods: "GET,POST"
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  allowed-methods: "GET,POST,PUT,PATCH,DELETE,OPTIONS"
 
 auth:
   jwt:
