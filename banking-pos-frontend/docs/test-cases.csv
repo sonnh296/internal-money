@@ -1,0 +1,32 @@
+# Banking POS E2E — map tới Playwright (npm run test:e2e)
+# Credentials: .env.e2e (copy từ .env.e2e.example)
+TC_ID,Module,Type,Priority,Title,Preconditions,Steps,Expected,Automated,Spec_File
+AUTH-01,Auth,Happy,P0,Đăng nhập khách hàng U1 thành công,Backend + U1 KYC VERIFIED có tài khoản,Mở /app/login → nhập email/password U1 → Đăng nhập,Redirect /app/dashboard; toast thành công; sidebar hiện email U1,Yes,e2e/auth.spec.ts
+AUTH-02,Auth,Happy,P0,Đăng nhập khách hàng U2 thành công,Backend + U2 KYC VERIFIED,Mở /app/login → nhập U2 → Đăng nhập,Vào dashboard,Yes,e2e/auth.spec.ts
+AUTH-03,Auth,Happy,P0,Đăng nhập admin thành công,Backend chạy,Mở /admin/login → nhập admin → Đăng nhập admin,Vào /admin/dashboard,Yes,e2e/auth.spec.ts
+AUTH-E01,Auth,Negative,P0,Sai mật khẩu U1,Backend chạy,Login U1 với password sai,Ở lại trang login; không vào dashboard,Yes,e2e/auth.spec.ts
+AUTH-E02,Auth,Negative,P1,Route protected redirect,Chưa login,Mở /app/transfer,Redirect /app/login,Yes,e2e/auth.spec.ts
+AUTH-E03,Auth,Negative,P1,Customer không vào admin,Đã login U1,Mở /admin/customers,Redirect admin login hoặc forbidden,Yes,e2e/auth.spec.ts
+AUTH-04,Auth,Happy,P1,Đăng xuất khách hàng,Đã login U1,Click Đăng xuất,Về /app/login; /app/dashboard redirect login,Yes,e2e/auth.spec.ts
+ACC-01,Account,Happy,P0,Dashboard hiển thị tài khoản,Login U1,Vào /app/dashboard,Có section tài khoản hoặc số dư (không báo chưa có TK nếu đã provision),Yes,e2e/account.spec.ts
+ACC-02,Account,Happy,P0,API accounts/me U1,Login U1 token,GET /account-api/api/v1/accounts/me,200; có accountNumber balance,Yes,e2e/api.spec.ts
+ACC-03,Account,Happy,P1,Trang Chuyển khoản có STK nguồn,Login U1,Vào /app/transfer,Hiện Tài khoản nguồn với .kbd số TK,Yes,e2e/account.spec.ts
+ACC-E01,Account,Negative,P1,Lookup STK không tồn tại,Login U1,Nhập STK 911111111 chờ 1.5s,Thông báo không tìm thấy,Yes,e2e/transfer-negative.spec.ts
+TRF-01,Transfer,Happy,P0,Chuyển U1 → U2 qua UI,U1 U2 có TK và đủ số dư,U1 transfer 10000 VND tới STK U2,Toast thành công; U2 balance tăng (API verify),Yes,e2e/transfer.spec.ts
+TRF-02,Transfer,Happy,P0,Chuyển U2 → U1,U2 đủ số dư,U2 transfer 5000 tới STK U1,Thành công,Yes,e2e/transfer.spec.ts
+TRF-E01,Transfer,Negative,P0,Không chuyển cho chính mình,Login U1,Nhập STK nguồn làm STK nhận,Hiện lỗi self-transfer; nút disabled,Yes,e2e/transfer-negative.spec.ts
+TRF-E02,Transfer,Negative,P0,Số tiền vượt khả dụng,Login U1,Nhập amount lớn hơn available,Hint vượt số dư; nút disabled,Yes,e2e/transfer-negative.spec.ts
+TRF-E03,Transfer,Negative,P0,Amount = 0 disable submit,Login U1,Đặt amount 0,Nút Chuyển khoản disabled,Yes,e2e/transfer-negative.spec.ts
+BP-01,BillPay,Happy,P0,Trang hóa đơn load,Login U1,Vào /app/bills,Hiện card Hóa đơn của tôi,Yes,e2e/bills.spec.ts
+BP-02,BillPay,Happy,P1,Thanh toán hóa đơn nếu có PENDING,U1 có invoice PENDING + Kafka workers,Chọn invoice → Thanh toán → chờ POSTED,Toast thành công hoặc đang xử lý,Yes,e2e/bills.spec.ts
+BP-E01,BillPay,Edge,P2,Không có hóa đơn pending,U1 không có invoice PENDING,Vào bills,Empty state hoặc không có nút pay,Yes,e2e/bills.spec.ts
+ADM-01,Admin,Happy,P0,Admin customers page,Login admin,Vào /admin/customers,Hiện quản lý khách hàng,Yes,e2e/admin.spec.ts
+ADM-02,Admin,Happy,P1,Admin health page,Login admin,Vào /admin/health,Hiện system health,Yes,e2e/admin.spec.ts
+SM-01,Smoke,Happy,P0,Health account API,AccountService chạy,GET health,200,Yes,e2e/api.spec.ts
+SM-02,Smoke,Happy,P0,Health payment API,PaymentOrchestrator chạy,GET health,200,Yes,e2e/api.spec.ts
+SM-03,Smoke,Happy,P1,Auth public endpoint,AuthUser chạy,GET test/public,200,Yes,e2e/api.spec.ts
+UI-01,UI,Happy,P1,Landing chọn cổng,Mở /,Hiện Cổng khách hàng và Cổng quản trị,Yes,e2e/ui.spec.ts
+UI-02,UI,Happy,P1,Navigation sidebar,Login U1,Click các mục nav,Đúng URL dashboard billers bills transfer profile,Yes,e2e/ui.spec.ts
+PRF-01,Profile,Happy,P2,Trang hồ sơ,Login U1,Vào /app/profile,Hiện thông tin hồ sơ,Yes,e2e/account.spec.ts
+BIL-01,Biller,Happy,P2,Trang dịch vụ,Login U1,Vào /app/billers,Hiện trang dịch vụ,Yes,e2e/bills.spec.ts
+API-E01,API,Negative,P1,Transfer không token,AccountService chạy,POST transfer không Bearer,401,Yes,e2e/api.spec.ts

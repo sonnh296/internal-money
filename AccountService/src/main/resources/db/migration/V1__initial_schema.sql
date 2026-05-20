@@ -1,7 +1,4 @@
--- AccountService: V1 - Khởi tạo schema ban đầu
--- Xóa data cũ để migration sạch
-
--- Sequence cho account number (đảm bảo không collision dù dưới tải cao)
+-- AccountService: V1 - Consolidated Schema
 CREATE SEQUENCE IF NOT EXISTS account_number_seq START 100000001 INCREMENT 1;
 
 CREATE TABLE IF NOT EXISTS account (
@@ -19,7 +16,6 @@ CREATE TABLE IF NOT EXISTS account (
     request_fingerprint VARCHAR(128) UNIQUE,
     created_at          TIMESTAMP    NOT NULL DEFAULT now(),
     updated_at          TIMESTAMP    NOT NULL DEFAULT now(),
-    -- Ràng buộc DB: số dư không được âm, bảo vệ tầng DB tránh bug code
     CONSTRAINT chk_account_balance_non_negative CHECK (balance >= 0)
 );
 
@@ -45,8 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_hold_account ON account_hold (account_id);
 CREATE INDEX IF NOT EXISTS idx_hold_status  ON account_hold (status);
 
 CREATE TABLE IF NOT EXISTS account_transaction (
-    id                          BIGSERIAL    PRIMARY KEY,
-    transaction_id              UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    transaction_id              UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid() PRIMARY KEY,
     account_id                  UUID         NOT NULL REFERENCES account(id),
     type                        VARCHAR(32)  NOT NULL,
     status                      VARCHAR(32)  NOT NULL DEFAULT 'POSTED',
@@ -63,7 +58,6 @@ CREATE TABLE IF NOT EXISTS account_transaction (
     created_at                  TIMESTAMPTZ,
     updated_at                  TIMESTAMPTZ,
     version                     INTEGER      NOT NULL DEFAULT 0,
-    -- Idempotency: mỗi tài khoản chỉ có một giao dịch với cùng fingerprint
     CONSTRAINT uk_tx_account_idem UNIQUE (account_id, request_fingerprint)
 );
 
@@ -71,3 +65,75 @@ CREATE INDEX IF NOT EXISTS idx_tx_account  ON account_transaction (account_id);
 CREATE INDEX IF NOT EXISTS idx_tx_occurred ON account_transaction (occurred_at);
 CREATE INDEX IF NOT EXISTS idx_tx_type     ON account_transaction (type);
 CREATE INDEX IF NOT EXISTS idx_tx_status   ON account_transaction (status);
+
+CREATE TABLE IF NOT EXISTS transaction_ledger (
+    id                  UUID          NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    transaction_group_id UUID         NOT NULL,
+    account_id          UUID          NOT NULL REFERENCES account(id),
+    entry_type          VARCHAR(8)    NOT NULL,
+    amount              DECIMAL(19,4) NOT NULL,
+    currency            VARCHAR(3)    NOT NULL,
+    reference_type      VARCHAR(32),
+    reference_id        VARCHAR(64),
+    created_at          TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    created_by          VARCHAR(255),
+    CONSTRAINT chk_ledger_entry_type CHECK (entry_type IN ('DEBIT', 'CREDIT')),
+    CONSTRAINT chk_ledger_amount_positive CHECK (amount > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ledger_group ON transaction_ledger (transaction_group_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_account ON transaction_ledger (account_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_created ON transaction_ledger (created_at);
+
+INSERT INTO account (
+    id, customer_id, account_number, account_type, account_sub_type,
+    status, currency, balance, version, created_at, updated_at
+) VALUES (
+    '00000000-0000-0000-0000-000000000099',
+    'SYSTEM',
+    '0000000000',
+    'CHEQUING',
+    'BUSINESS',
+    'ACTIVE',
+    'VND',
+    0,
+    0,
+    now(),
+    now()
+) ON CONFLICT (id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION check_ledger_balance()
+RETURNS TRIGGER AS $$
+DECLARE
+    balance DECIMAL(19,4);
+BEGIN
+    SELECT COALESCE(SUM(CASE WHEN entry_type = 'CREDIT' THEN amount ELSE 0 END), 0) -
+           COALESCE(SUM(CASE WHEN entry_type = 'DEBIT' THEN amount ELSE 0 END), 0)
+    INTO balance
+    FROM transaction_ledger
+    WHERE transaction_group_id = NEW.transaction_group_id;
+
+    IF balance != 0 THEN
+        RAISE EXCEPTION 'Ledger out of balance for group %%: difference is %%', NEW.transaction_group_id, balance;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER trg_check_ledger_balance
+    AFTER INSERT OR UPDATE ON transaction_ledger
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION check_ledger_balance();
+
+CREATE TABLE IF NOT EXISTS idempotency_record (
+    idempotency_key VARCHAR(128) PRIMARY KEY,
+    service_name VARCHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    response_status INTEGER,
+    response_snapshot TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_idempotency_created_at ON idempotency_record (created_at);

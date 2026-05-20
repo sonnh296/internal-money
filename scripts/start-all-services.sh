@@ -12,7 +12,7 @@ start_service() {
   local name="$1"
   local dir="$2"
   local profile="${3:-}"
-  local extra="${4:-}"
+  local extra="${4:--Dmaven.test.skip=true}"
   echo "Starting $name..."
   (
     cd "$ROOT/$dir"
@@ -37,11 +37,10 @@ start_service settlement SettlementService ""
 start_service eft EFTService ""
 start_service eft-worker EFTWorkerService ""
 start_service gateway ApiGateway ""
-start_service pos pos/boost ""
 
 echo "Waiting for core services..."
 sleep 45
-for port in 8094 8083 8084 8088 8086 8090 8080 8082; do
+for port in 8094 8083 8084 8088 8086 8090 8080; do
   if curl -sf "http://localhost:${port}/actuator/health" >/dev/null 2>&1 \
     || curl -sf "http://localhost:${port}/api/v1/health" >/dev/null 2>&1; then
     echo "  OK :$port"

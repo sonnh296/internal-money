@@ -1,5 +1,4 @@
--- PaymentOrchestrator: V1 - Khởi tạo schema ban đầu
-
+-- PaymentOrchestrator: V1 - Consolidated Schema
 CREATE TABLE IF NOT EXISTS payments (
     payment_id           UUID          NOT NULL PRIMARY KEY,
     state                VARCHAR(20)   NOT NULL,
@@ -13,7 +12,6 @@ CREATE TABLE IF NOT EXISTS payments (
     external_status_code VARCHAR(255),
     reason               VARCHAR(255),
     idempotency_key      VARCHAR(80)   NOT NULL,
-    -- Optimistic lock: tránh concurrent update trên cùng payment
     version              INTEGER       NOT NULL DEFAULT 0,
     created_at           TIMESTAMPTZ   NOT NULL DEFAULT now(),
     updated_at           TIMESTAMPTZ   NOT NULL DEFAULT now(),
@@ -24,11 +22,10 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS idx_payment_batch_id ON payments (batch_id);
 CREATE INDEX IF NOT EXISTS idx_payment_state    ON payments (state);
 
--- Bảng outbox: ghi event cùng DB transaction với business logic, publisher đọc và gửi Kafka
 CREATE TABLE IF NOT EXISTS outbox (
     id           BIGSERIAL    PRIMARY KEY,
     topic        VARCHAR(120) NOT NULL,
-    key          UUID         NOT NULL,
+    message_key  VARCHAR(255) NOT NULL,
     payload_json TEXT         NOT NULL,
     state        VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
@@ -37,7 +34,6 @@ CREATE TABLE IF NOT EXISTS outbox (
 
 CREATE INDEX IF NOT EXISTS idx_outbox_state ON outbox (state, id);
 
--- Bảng idempotency cho Kafka consumers: tránh xử lý cùng một event 2 lần
 CREATE TABLE IF NOT EXISTS processed_events (
     id           BIGSERIAL    PRIMARY KEY,
     handler      VARCHAR(80)  NOT NULL,
@@ -46,7 +42,6 @@ CREATE TABLE IF NOT EXISTS processed_events (
     CONSTRAINT uk_handler_event UNIQUE (handler, event_id)
 );
 
--- Bảng retry tickets cho batch retry logic
 CREATE TABLE IF NOT EXISTS retries (
     id              BIGSERIAL    PRIMARY KEY,
     batch_id        VARCHAR(64)  NOT NULL,

@@ -7,6 +7,5 @@ export const env = {
   customerBaseUrl: required('VITE_CUSTOMER_URL', '/customer-api'),
   accountBaseUrl: required('VITE_ACCOUNT_URL', '/account-api'),
   paymentBaseUrl: required('VITE_PAYMENT_URL', '/payment-api'),
-  billerBaseUrl: required('VITE_BILLER_URL', '/biller-api'),
-  posBaseUrl: required('VITE_POS_URL', '/pos-api')
+  billerBaseUrl: required('VITE_BILLER_URL', '/biller-api')
 }

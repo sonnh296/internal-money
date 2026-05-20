@@ -4,21 +4,19 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.5</version>
-        <relativePath/>
+        <groupId>com.mockbank</groupId>
+        <artifactId>banking-pos-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <groupId>com.settlement</groupId>
+    <groupId>com.mockbank.settlement</groupId>
     <artifactId>settlement-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>settlement-service</name>
     <description>BillPay Settlement Service for MockBank</description>
 
-    <properties>
-        <java.version>17</java.version>
-    </properties>
+    
 
     <dependencies>
         <!-- Spring Boot -->
@@ -65,9 +63,8 @@
 
         <!-- Common DTO module (adjust groupId/artifactId/version to your repo) -->
        <dependency>
-			<groupId>com.commons</groupId>
+			<groupId>com.mockbank</groupId>
 			<artifactId>commons-dto</artifactId>
-			<version>1.0.0</version>
 		</dependency>
 
         <dependency>
@@ -87,6 +84,18 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

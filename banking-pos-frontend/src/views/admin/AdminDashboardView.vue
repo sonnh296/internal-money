@@ -112,17 +112,9 @@ onMounted(refresh)
           <h2>Dịch vụ & Hóa đơn</h2>
           <p class="lead">Quản lý catalog dịch vụ và phát hành hóa đơn.</p>
         </RouterLink>
-        <RouterLink :to="APP_ROUTES.ADMIN_POS_BENCHMARK" class="card">
-          <h2>POS Benchmark</h2>
-          <p class="lead">Đo tải đồng thời cho hệ thống điểm thưởng POS.</p>
-        </RouterLink>
         <RouterLink :to="APP_ROUTES.ADMIN_HEALTH" class="card">
           <h2>System Health</h2>
           <p class="lead">Theo dõi trạng thái sống của các service cốt lõi.</p>
-        </RouterLink>
-        <RouterLink :to="APP_ROUTES.ADMIN_MANAGERS" class="card">
-          <h2>Quản lý Managers</h2>
-          <p class="lead">Phân quyền và bật/tắt tài khoản manager nội bộ.</p>
         </RouterLink>
       </div>
     </section>

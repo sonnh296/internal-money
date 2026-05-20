@@ -6,8 +6,7 @@ import { useUserAuthStore } from '../../stores/userAuth.store'
 import { useApiAction } from '../../composables/useApiAction'
 import { getCustomerApi } from '../../api/customer.api'
 import { getMyAccountApi, listTransactionsApi } from '../../api/account.api'
-import { getMyRewardPointsApi } from '../../api/payment.api'
-import type { AccountResponse, CustomerResponse, RewardPointsResponse, TransactionResponse } from '../../types/api.types'
+import type { AccountResponse, CustomerResponse, TransactionResponse } from '../../types/api.types'
 import { counterpartyLine, flowLabel, typeLabel } from '../../utils/transactionLabels'
 import StatTile from '../../components/StatTile.vue'
 import EmptyState from '../../components/EmptyState.vue'
@@ -21,8 +20,6 @@ const profileMissing = ref(false)
 const profileError = ref('')
 const myAccount = ref<AccountResponse | null>(null)
 const recentTx = ref<TransactionResponse[]>([])
-const rewards = ref<RewardPointsResponse | null>(null)
-
 const customerId = computed(() => auth.profile.customerId || '')
 
 const totalBalance = computed(() => Number(myAccount.value?.balance ?? 0))
@@ -59,9 +56,6 @@ async function refresh() {
     else if (data && Array.isArray((data as { items?: unknown[] }).items))
       recentTx.value = (data as { items: TransactionResponse[] }).items
   }
-
-  const rewardResp = await run('Lấy điểm thưởng', () => getMyRewardPointsApi(), { silent: true })
-  rewards.value = rewardResp.data as RewardPointsResponse
 }
 
 function format(currency: string, value: number): string {
@@ -120,11 +114,6 @@ onMounted(refresh)
         label="Trạng thái phiên"
         :value="auth.isAuthenticated ? 'Hoạt động' : 'Hết hạn'"
         :hint="auth.profile.email || 'Chưa rõ email'"
-      />
-      <StatTile
-        label="Điểm thưởng"
-        :value="rewards?.points ?? 0"
-        :hint="rewards ? `${(rewards.points / 10).toFixed(2)} VND có thể giảm trừ` : 'Chưa có dữ liệu'"
       />
     </section>
 

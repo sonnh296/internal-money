@@ -29,16 +29,18 @@ spring:
       hibernate:
         format_sql: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8094
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info
 
-# TODO: set issuer-uri when wiring Auth0 / JWKS
-# spring:
-#   security:
-#     oauth2:
-#       resourceserver:
-#         jwt:
-#           issuer-uri: https://YOUR_TENANT/
+auth:
+  jwt:
+    audience: https://mockbank/api

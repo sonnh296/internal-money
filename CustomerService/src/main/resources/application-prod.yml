@@ -45,5 +45,3 @@ resilience4j.circuitbreaker:
 auth:
   service:
     url: ${AUTH_SERVICE_URL}
-
-

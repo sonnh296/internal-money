@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.10</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.mockbank</groupId>
+    <artifactId>banking-pos-parent</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>banking-pos-parent</name>
+    <description>MockBank banking POS platform</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <spring-cloud.version>2024.0.2</spring-cloud.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <flyway.version>10.10.0</flyway.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <commons-codec.version>1.17.0</commons-codec.version>
+        <postgresql.version>42.7.3</postgresql.version>
+    </properties>
+
+    <modules>
+        <module>commons-dto</module>
+        <module>commons-security</module>
+        <module>commons-observability</module>
+        <module>AuthUser</module>
+        <module>CustomerService</module>
+        <module>AccountService</module>
+        <module>ApiGateway</module>
+        <module>PaymentOrchestrator</module>
+        <module>BillerService</module>
+        <module>BillPayWorkerService</module>
+        <module>SettlementService</module>
+        <module>EFTService</module>
+        <module>EFTWorkerService</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.mockbank</groupId>
+                <artifactId>commons-dto</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.mockbank</groupId>
+                <artifactId>commons-security</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.mockbank</groupId>
+                <artifactId>commons-observability</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot3</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-codec</groupId>
+                <artifactId>commons-codec</artifactId>
+                <version>${commons-codec.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <release>${java.version}</release>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

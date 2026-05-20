@@ -35,5 +35,12 @@ coverage
 # Vitest
 __screenshots__/
 
+# Playwright E2E
+/test-results/
+/playwright-report/
+/blob-report/
+/e2e/.cache/
+.env.e2e
+
 # Vite
 *.timestamp-*-*.mjs

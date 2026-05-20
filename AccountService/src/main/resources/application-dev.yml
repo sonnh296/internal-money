@@ -58,18 +58,15 @@ resilience4j:
 logging:
   level:
     org.springframework.security: DEBUG
-    
+
 account:
   service:
     url: http://localhost:8084
-    
 
 customer:
   service:
     url: http://localhost:8083
 
-auth0:
-  audience: https://mockbank/api
-
-
-
+auth:
+  jwt:
+    audience: https://mockbank/api

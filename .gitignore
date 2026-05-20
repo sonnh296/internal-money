@@ -2,6 +2,7 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 log/
 logs/
+.run-logs/
 *.log
 
 **/*.class

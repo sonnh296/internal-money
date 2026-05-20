@@ -137,9 +137,3 @@ export interface InternalTransferResponse {
   occurredAt: string
 }
 
-export interface RewardPointsResponse {
-  customerId: string
-  points: number
-  source: string
-  inSync: boolean
-}

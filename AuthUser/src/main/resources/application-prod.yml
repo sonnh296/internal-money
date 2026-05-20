@@ -33,19 +33,6 @@ cors:
   allowed-origins: "*"
   allowed-methods: "GET,POST"
 
-consent:
-  service:
-    url: ${CONSENT_SERVICE_URL}
-
-auth0:
-  domain: ${AUTH0_DOMAIN}
-  mgmt-client-id: ${AUTH0_MGMT_CLIENT_ID}
-  mgmt-client-secret: ${AUTH0_MGMT_CLIENT_SECRET}
-  audience: ${AUTH0_AUDIENCE}
-  loginClientId: ${AUTH0_LOGIN_CLIENT_ID}
-  loginClientSecret: ${AUTH0_LOGIN_CLIENT_SECRET}
-  loginAudience: ${AUTH0_LOGIN_AUDIENCE}
-
 auth:
   jwt:
     issuer: ${AUTH_JWT_ISSUER}

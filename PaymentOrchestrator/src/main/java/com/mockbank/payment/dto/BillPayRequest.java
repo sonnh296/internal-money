@@ -1,0 +1,13 @@
+package com.mockbank.payment.dto;
+
+import jakarta.validation.constraints.*;
+import java.util.UUID;
+
+public record BillPayRequest(
+  @NotNull UUID debtorAccountId,
+  @NotBlank String billerReferenceNumber,
+  @NotBlank String invoiceReference,
+  @NotBlank String executionDate,          // yyyy-MM-dd
+  @NotNull  AmountDto amount,
+  String note
+) {}

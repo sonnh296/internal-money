@@ -10,11 +10,9 @@ import LandingView from '../views/LandingView.vue'
 import AdminLayout from '../views/admin/AdminLayout.vue'
 import AdminLoginView from '../views/admin/AdminLoginView.vue'
 import AdminDashboardView from '../views/admin/AdminDashboardView.vue'
-import AdminManagersView from '../views/admin/AdminManagersView.vue'
 import AdminCustomersView from '../views/admin/AdminCustomersView.vue'
 import AdminServicesView from '../views/admin/AdminServicesView.vue'
 import AdminHealthView from '../views/admin/AdminHealthView.vue'
-import AdminPosBenchmarkView from '../views/admin/AdminPosBenchmarkView.vue'
 
 import AppLayout from '../views/app/AppLayout.vue'
 import AppLoginView from '../views/app/AppLoginView.vue'
@@ -22,7 +20,6 @@ import AppRegisterView from '../views/app/AppRegisterView.vue'
 import AppDashboardView from '../views/app/AppDashboardView.vue'
 import AppAccountDetailView from '../views/app/AppAccountDetailView.vue'
 import AppTransferView from '../views/app/AppTransferView.vue'
-import AppRewardsView from '../views/app/AppRewardsView.vue'
 import AppBillersView from '../views/app/AppBillersView.vue'
 import AppBillsView from '../views/app/AppBillsView.vue'
 import AppProfileView from '../views/app/AppProfileView.vue'
@@ -46,10 +43,8 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: '', redirect: APP_ROUTES.ADMIN_DASHBOARD },
       { path: 'dashboard', component: AdminDashboardView, meta: { portal: 'admin', requiresAdmin: true, title: 'Dashboard' } },
-      { path: 'managers', component: AdminManagersView, meta: { portal: 'admin', requiresAdmin: true, title: 'Quản lý Managers' } },
       { path: 'customers', component: AdminCustomersView, meta: { portal: 'admin', requiresAdmin: true, title: 'Khách hàng & Tài khoản' } },
       { path: 'services', component: AdminServicesView, meta: { portal: 'admin', requiresAdmin: true, title: 'Dịch vụ & Hóa đơn' } },
-      { path: 'pos-benchmark', component: AdminPosBenchmarkView, meta: { portal: 'admin', requiresAdmin: true, title: 'POS Benchmark' } },
       { path: 'health', component: AdminHealthView, meta: { portal: 'admin', requiresAdmin: true, title: 'System Health' } }
     ]
   },
@@ -74,7 +69,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'accounts', redirect: APP_ROUTES.APP_PROFILE },
       { path: 'accounts/:id', component: AppAccountDetailView, meta: { portal: 'user', requiresUser: true, title: 'Chi tiết tài khoản' } },
       { path: 'transfer', component: AppTransferView, meta: { portal: 'user', requiresUser: true, title: 'Chuyển khoản nội bộ' } },
-      { path: 'rewards', component: AppRewardsView, meta: { portal: 'user', requiresUser: true, title: 'Điểm thưởng' } },
       { path: 'billers', component: AppBillersView, meta: { portal: 'user', requiresUser: true, title: 'Dịch vụ' } },
       { path: 'bills', component: AppBillsView, meta: { portal: 'user', requiresUser: true, title: 'Hóa đơn của tôi' } },
       { path: 'profile', component: AppProfileView, meta: { portal: 'user', requiresUser: true, title: 'Hồ sơ của tôi' } }

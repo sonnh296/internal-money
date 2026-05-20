@@ -41,12 +41,6 @@ spring:
             - Path=/biller-api/**
           filters:
             - StripPrefix=1
-        - id: pos-api
-          uri: ${POS_SERVICE_URL:http://localhost:8082}
-          predicates:
-            - Path=/pos-api/**
-          filters:
-            - StripPrefix=1
 
 management:
   endpoints:

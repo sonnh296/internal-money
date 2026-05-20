@@ -3,11 +3,11 @@ import axios from 'axios'
 import { computed, onMounted, ref } from 'vue'
 import { listMyInvoicesApi } from '../../api/biller.api'
 import { getMyAccountApi } from '../../api/account.api'
-import { createBillPayApi, getMyRewardPointsApi, getPaymentApi } from '../../api/payment.api'
+import { createBillPayApi, getPaymentApi } from '../../api/payment.api'
 import { useApiAction } from '../../composables/useApiAction'
 import { useNotifyStore } from '../../stores/notify.store'
 import EmptyState from '../../components/EmptyState.vue'
-import type { AccountResponse, RewardPointsResponse } from '../../types/api.types'
+import type { AccountResponse } from '../../types/api.types'
 
 const notify = useNotifyStore()
 const { run, running } = useApiAction()
@@ -25,28 +25,11 @@ interface Invoice {
 
 const invoices = ref<Invoice[]>([])
 const myAccount = ref<AccountResponse | null>(null)
-const rewards = ref<RewardPointsResponse | null>(null)
 const selectedInvoiceId = ref('')
-const pointsToRedeem = ref(0)
 
 const pendingInvoices = computed(() => invoices.value.filter((i) => i.status === 'PENDING'))
 const selectedInvoice = computed(() => pendingInvoices.value.find((i) => i.id === selectedInvoiceId.value) ?? null)
 const totalPending = computed(() => pendingInvoices.value.length)
-const pointsValue = computed(() => (rewards.value?.points ?? 0) / 10)
-
-const maxRedeemablePoints = computed(() => {
-  if (!selectedInvoice.value) return 0
-  const inv = selectedInvoice.value
-  const pointsByBalance = rewards.value?.points ?? 0
-  const pointsByAmount = Math.max(0, Math.floor((Number(inv.amount) - 0.01) * 10))
-  return Math.min(pointsByBalance, pointsByAmount)
-})
-
-const discountFromPoints = computed(() => Math.min(pointsToRedeem.value / 10, Number(selectedInvoice.value?.amount ?? 0)))
-const amountToPay = computed(() => {
-  if (!selectedInvoice.value) return 0
-  return Math.max(0.01, Number(selectedInvoice.value.amount) - discountFromPoints.value)
-})
 
 const availableForPay = computed(() => {
   if (!myAccount.value) return 0
@@ -58,19 +41,16 @@ const availableForPay = computed(() => {
 
 const canPay = computed(() => {
   if (!myAccount.value || !selectedInvoice.value) return false
-  if (pointsToRedeem.value < 0 || pointsToRedeem.value > maxRedeemablePoints.value) return false
-  return amountToPay.value <= availableForPay.value
+  return Number(selectedInvoice.value.amount) <= availableForPay.value
 })
 
 async function load() {
-  const [invoiceResp, accountResp, rewardResp] = await Promise.all([
+  const [invoiceResp, accountResp] = await Promise.all([
     run('Lấy hóa đơn', () => listMyInvoicesApi(), { silent: true }),
-    run('Lấy tài khoản', () => getMyAccountApi(), { silent: true }).catch(() => ({ data: null })),
-    run('Lấy điểm thưởng', () => getMyRewardPointsApi(), { silent: true })
+    run('Lấy tài khoản', () => getMyAccountApi(), { silent: true }).catch(() => ({ data: null }))
   ])
   invoices.value = Array.isArray(invoiceResp.data) ? (invoiceResp.data as Invoice[]) : []
   myAccount.value = accountResp.data as AccountResponse | null
-  rewards.value = rewardResp.data as RewardPointsResponse
   if (!selectedInvoiceId.value && pendingInvoices.value[0]) {
     selectedInvoiceId.value = pendingInvoices.value[0].id
   }
@@ -78,7 +58,6 @@ async function load() {
 
 function selectInvoice(inv: Invoice) {
   selectedInvoiceId.value = inv.id
-  pointsToRedeem.value = 0
 }
 
 function sleep(ms: number) {
@@ -105,9 +84,6 @@ async function paySelected() {
     return
   }
   const inv = selectedInvoice.value
-  const cappedPoints = Math.min(Math.max(0, Math.floor(pointsToRedeem.value)), maxRedeemablePoints.value)
-  pointsToRedeem.value = cappedPoints
-
   const paidInvoiceId = inv.id
   try {
     const resp = await run(`Thanh toán hóa đơn ${inv.id.slice(0, 8)}`, () =>
@@ -118,13 +94,11 @@ async function paySelected() {
           invoiceReference: inv.id,
           executionDate: new Date().toISOString().slice(0, 10),
           amount: { value: Number(inv.amount), currency: inv.currency || myAccount.value!.currency || 'VND' },
-          note: `Pay invoice ${inv.id}`,
-          pointsToRedeem: cappedPoints > 0 ? cappedPoints : undefined
+          note: `Pay invoice ${inv.id}`
         },
         `billpay-invoice-${inv.id}-${Date.now()}`
       )
     )
-    pointsToRedeem.value = 0
     const paymentId = String((resp.data as { paymentId?: string })?.paymentId ?? '')
     if (paymentId) {
       const finalState = await waitForPaymentFinal(paymentId)
@@ -170,7 +144,7 @@ onMounted(load)
         <div>
           <h2>Hóa đơn của tôi</h2>
           <p class="lead">
-            Chọn một hóa đơn chờ thanh toán, nhập điểm thưởng (nếu có) và thanh toán từ panel bên dưới.
+            Chọn một hóa đơn chờ thanh toán và thanh toán từ panel bên dưới.
             <span v-if="totalPending > 0" style="color: #f59e0b; font-weight:600;">
               {{ totalPending }} hóa đơn chưa thanh toán.
             </span>
@@ -185,7 +159,6 @@ onMounted(load)
         <span v-if="Number(myAccount.totalHolds ?? 0) > 0" class="muted">
           (tổng {{ formatMoney(myAccount.currency, Number(myAccount.balance)) }}, giữ {{ formatMoney(myAccount.currency, Number(myAccount.totalHolds)) }})
         </span>
-        · Điểm thưởng: <strong>{{ rewards?.points ?? 0 }}</strong> (≈ {{ formatMoney(myAccount.currency, pointsValue) }})
       </div>
       <p v-else class="hint" style="margin-top:12px; color:#b45309;">
         Bạn chưa có tài khoản thanh toán. Liên hệ ngân hàng để kích hoạt tài khoản sau khi KYC được duyệt.
@@ -202,14 +175,9 @@ onMounted(load)
             </option>
           </select>
         </label>
-        <label>Điểm thưởng sử dụng
-          <input v-model.number="pointsToRedeem" type="number" min="0" :max="maxRedeemablePoints" step="1" />
-        </label>
       </div>
       <p class="hint" v-if="selectedInvoice">
-        Giảm từ điểm: <strong>{{ formatMoney(selectedInvoice.currency, discountFromPoints) }}</strong>
-        · Số tiền thực trả: <strong>{{ formatMoney(selectedInvoice.currency, amountToPay) }}</strong>
-        · Tối đa {{ maxRedeemablePoints }} điểm cho hóa đơn này.
+        Số tiền thanh toán: <strong>{{ formatMoney(selectedInvoice.currency, Number(selectedInvoice.amount)) }}</strong>
       </p>
       <div class="actions">
         <button :disabled="running || !canPay" @click="paySelected">Thanh toán</button>
@@ -221,42 +189,33 @@ onMounted(load)
         <table>
           <thead>
             <tr>
-              <th></th>
-              <th>Dịch vụ</th>
-              <th>Mã tham chiếu</th>
+              <th>Gói dịch vụ</th>
               <th>Số tiền</th>
-              <th>Hạn thanh toán</th>
+              <th>Hạn</th>
               <th>Trạng thái</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="inv in invoices"
               :key="inv.id"
-              :class="{ 'row-selected': inv.id === selectedInvoiceId && inv.status === 'PENDING' }"
-              @click="inv.status === 'PENDING' ? selectInvoice(inv) : undefined"
+              :class="{ selected: inv.id === selectedInvoiceId }"
+              @click="selectInvoice(inv)"
             >
+              <td>{{ inv.packageName }}</td>
+              <td>{{ formatMoney(inv.currency, inv.amount) }}</td>
+              <td :class="{ overdue: isOverdue(inv.dueDate) }">{{ inv.dueDate }}</td>
+              <td><span class="pill" :class="inv.status === 'PAID' ? 'success' : 'warning'">{{ inv.status }}</span></td>
               <td>
-                <input
-                  v-if="inv.status === 'PENDING'"
-                  type="radio"
-                  :checked="inv.id === selectedInvoiceId"
-                  @change="selectInvoice(inv)"
-                />
-              </td>
-              <td>{{ inv.packageName || '—' }}</td>
-              <td><span class="kbd small">{{ inv.billerReferenceNumber }}</span></td>
-              <td><strong>{{ inv.amount }} {{ inv.currency }}</strong></td>
-              <td :style="isOverdue(inv.dueDate) && inv.status === 'PENDING' ? 'color: #ef4444' : ''">
-                {{ inv.dueDate }}
-                <span v-if="isOverdue(inv.dueDate) && inv.status === 'PENDING'" class="pill danger" style="margin-left:4px;">Quá hạn</span>
-              </td>
-              <td>
-                <span class="pill" :class="{
-                  success: inv.status === 'PAID',
-                  warning: inv.status === 'PENDING' && !isOverdue(inv.dueDate),
-                  danger: inv.status === 'PENDING' && isOverdue(inv.dueDate)
-                }">{{ inv.status }}</span>
+                <button
+                  v-if="inv.status === 'PENDING' && myAccount"
+                  class="small"
+                  :disabled="running"
+                  @click.stop="selectInvoice(inv); paySelected()"
+                >
+                  Thanh toán
+                </button>
               </td>
             </tr>
           </tbody>
@@ -264,23 +223,16 @@ onMounted(load)
       </div>
     </section>
 
-    <EmptyState
-      v-else-if="!running && myAccount"
-      icon="⊟"
-      title="Chưa có hóa đơn nào"
-      hint="Đăng ký dịch vụ để nhận hóa đơn khi admin tạo. Xem trang Dịch vụ để đăng ký."
-    />
+    <EmptyState v-else-if="!running" title="Chưa có hóa đơn" message="Đăng ký dịch vụ để nhận hóa đơn." />
   </div>
 </template>
 
 <style scoped>
-.row-selected td {
-  background: rgba(99, 102, 241, 0.08);
+tr.selected {
+  background: rgba(59, 130, 246, 0.08);
 }
-tbody tr {
-  cursor: default;
-}
-tbody tr:has(input[type='radio']) {
-  cursor: pointer;
+.overdue {
+  color: #dc2626;
+  font-weight: 600;
 }
 </style>

@@ -9,21 +9,20 @@ Tài liệu mô tả **hiện trạng** repo `banking-pos`, **best practice**, v
 | Thành phần | Việc đang làm |
 |------------|----------------|
 | **CustomerService** | Hồ sơ khách (`customerdb`), KYC, `externalId` — **không** lưu password login |
-| **AuthUser** | Gọi Auth0 Management API → `POST /api/v1/iam/users` sau KYC |
-| **Auth0** | Login app, phát JWT, scopes (`fdx:accounts.read`, …) |
-| **commons-security** | Mọi service validate JWT Auth0 (`issuer-uri`, `audience`) |
+| **AuthUser** | Internal IAM: login, refresh, JWT issuer, `POST /api/v1/internal/users` sau KYC |
+| **commons-security** | Mọi service validate JWT (`issuer-uri`, `auth.jwt.audience`) |
 | **Account / Biller / Payment** | Chỉ tin JWT + `@PreAuthorize` |
 
 ### Luồng hôm nay
 
 ```
 Đăng ký profile → CustomerService (DB bạn)
-KYC VERIFIED    → AuthUser → tạo user trên Auth0
-Mở app          → Login Auth0 (bên ngoài) → JWT
-Gọi API         → Bearer JWT Auth0
+KYC VERIFIED    → AuthUser → `POST /api/v1/internal/users`
+Mở app          → Login AuthUser → JWT
+Gọi API         → Bearer JWT (issuer AuthUser)
 ```
 
-**Hệ quả:** User “đăng nhập” **không** nằm trong bảng `customers` — identity nằm trên Auth0.
+**Hệ quả:** User đăng nhập nằm trong `auth_users` (AuthUser); profile khách nằm trong `customers` (CustomerService).
 
 ### Port service (local dev)
 
@@ -276,16 +275,16 @@ Không cần tenant Auth0.
 
 ---
 
-## 11. So sánh nhanh: Auth0 vs hệ thống bạn
+## 11. So sánh nhanh: trước / sau consolidation
 
-| | Hiện tại (Auth0) | Mục tiêu (IAM nội bộ) |
-|--|------------------|------------------------|
-| Đăng ký profile | CustomerService | Giữ nguyên |
-| Login UI | Auth0 Universal Login | App → API của bạn |
-| User credential | Auth0 | `authdb.users` |
-| JWT issuer | `*.auth0.com` | Auth service của bạn |
-| Sau KYC | AuthUser → Auth0 API | AuthUser → tạo `users` local |
-| M2M service | Auth0 client_credentials | Có thể giữ pattern, đổi token endpoint |
+| | Trước (Auth0-centric) | Hiện tại (IAM nội bộ) |
+|--|----------------------|------------------------|
+| Đăng ký profile | CustomerService | CustomerService |
+| Login UI | Auth0 Universal Login | App → AuthUser `/api/v1/auth/login` |
+| User credential | Auth0 | `authdb.auth_users` |
+| JWT issuer | `*.auth0.com` | AuthUser (`http://localhost:8094` dev) |
+| Sau KYC | Auth0 Management API | `POST /api/v1/internal/users` |
+| M2M service | Auth0 `client_credentials` | AuthUser `/oauth/token` + `mockbank-auth` provider |
 
 ---
 

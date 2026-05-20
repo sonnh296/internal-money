@@ -1,4 +1,4 @@
--- BillerService: V1 - Khởi tạo schema ban đầu
+-- BillerService: V1 - Consolidated Schema
 
 CREATE TABLE IF NOT EXISTS service_packages (
     id               UUID          NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,

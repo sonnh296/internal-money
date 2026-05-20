@@ -63,7 +63,6 @@ npm run dev            # http://localhost:5173
 |-------|----------|
 | `/admin/login` | Đăng nhập admin (gate: scope `admin:users.write` hoặc customerId `admin-…`) |
 | `/admin/dashboard` | Overview accounts, billers, scopes, smoke test |
-| `/admin/users` | Provision admin/user qua `/internal/users` & `/iam/users` |
 | `/admin/customers` | CRUD customer + KYC + version + exists checks |
 | `/admin/accounts` | Tạo account, đổi status, force credit/debit, hold/release |
 | `/admin/billers` | Catalog billers + isActive |

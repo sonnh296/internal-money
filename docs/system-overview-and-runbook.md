@@ -16,6 +16,7 @@
 - `EFTService` + `EFTWorkerService`: EFT domain services.
 
 Shared modules:
+
 - `commons-security`: JWT/security helpers.
 - `commons-dto`: event/request DTOs.
 - `commons-observability`: common observability code.
@@ -71,6 +72,7 @@ chmod +x scripts/reset-local-data.sh
 ```
 
 This script:
+
 - Drops and recreates service databases (`customerdb`, `accountsdb`, `billerdb`, `paymentdb`, `billpayworkerdb`, `settlementdb`, `eftdb`, `eftworkerdb`)
 - Clears `authdb` non-admin users and refresh tokens
 - Keeps `admin.demo@mockbank.local` so admin login remains available
@@ -92,6 +94,7 @@ cd EFTWorkerService && mvn spring-boot:run
 ```
 
 Notes:
+
 - `AuthUser` (dev profile) seeds demo admin automatically via `DemoAdminSeeder`.
 - Some workers/features may depend on Kafka for full async flow.
 

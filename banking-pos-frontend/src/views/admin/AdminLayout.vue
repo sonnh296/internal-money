@@ -21,9 +21,7 @@ const expiresText = computed(() => {
   const seconds = Math.max(0, Math.round((auth.expiresAt - Date.now()) / 1000))
   return `${seconds}s`
 })
-const visibleNavItems = computed(() =>
-  ADMIN_NAV_ITEMS.filter((item) => !item.superAdminOnly || auth.isSuperAdmin)
-)
+const visibleNavItems = computed(() => ADMIN_NAV_ITEMS)
 
 async function doLogout() {
   await auth.logout()

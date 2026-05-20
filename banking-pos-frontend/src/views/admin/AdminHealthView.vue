@@ -13,8 +13,7 @@ const services = [
   { id: 'customer', label: 'CustomerService', baseUrl: env.customerBaseUrl, healthPath: '/api/v1/customers/health' },
   { id: 'account', label: 'AccountService', baseUrl: env.accountBaseUrl, healthPath: '/api/v1/health' },
   { id: 'payment', label: 'PaymentOrchestrator', baseUrl: env.paymentBaseUrl, healthPath: '/api/v1/health' },
-  { id: 'biller', label: 'BillerService', baseUrl: env.billerBaseUrl, healthPath: '/api/v1/health' },
-  { id: 'pos', label: 'POS Boost', baseUrl: env.posBaseUrl, healthPath: '/actuator/health' }
+  { id: 'biller', label: 'BillerService', baseUrl: env.billerBaseUrl, healthPath: '/api/v1/health' }
 ]
 
 const status = reactive<Record<string, { ok: boolean; code: number; message: string; ms: number } | null>>({})

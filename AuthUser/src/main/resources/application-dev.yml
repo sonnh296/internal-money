@@ -31,12 +31,8 @@ spring:
 logging:
   level:
     root: INFO
-    com.authuser: DEBUG
+    com.mockbank.auth: DEBUG
     org.springframework.security: INFO
-
-consent:
-  service:
-    url: http://localhost:8096/api/v1
 
 auth:
   jwt:
@@ -58,11 +54,3 @@ app:
     email: user.demo@mockbank.local
     password: ${DEMO_USER_PASSWORD:User@12345}
     customer-id: cust-demo-001
-
-auth0:
-  audience: https://mockbank/api
-  domain: ${AUTH0_DOMAIN:https://dev-wgk04dj5v68sbhre.us.auth0.com}
-  mgmt:
-    client-id: ${AUTH0_MGMT_CLIENT_ID:7m9h4UQsjOeVom5ysSt0t3TFLRgibBkT}
-    client-secret: ${AUTH0_MGMT_CLIENT_SECRET:XXXXXXX}
-    audience: ${AUTH0_MGMT_AUDIENCE:https://dev-wgk04dj5v68sbhre.us.auth0.com/api/v2/}

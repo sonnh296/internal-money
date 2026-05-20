@@ -11,15 +11,13 @@
   <description>MockBank EFT Service (External Accounts) - skeleton for audience coding</description>
 
   <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.4.1</version>
-    <relativePath/>
-  </parent>
+        <groupId>com.mockbank</groupId>
+        <artifactId>banking-pos-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
 
-  <properties>
-    <java.version>17</java.version>
-  </properties>
+  
 
   <dependencies>
     <dependency>

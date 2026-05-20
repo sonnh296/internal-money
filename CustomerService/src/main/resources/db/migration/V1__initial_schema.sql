@@ -1,7 +1,6 @@
--- CustomerService: V1 - Khởi tạo schema ban đầu
-
+-- CustomerService: V1 - Initial schema with UUID PK
 CREATE TABLE IF NOT EXISTS customers (
-    id                  BIGSERIAL    PRIMARY KEY,
+    id                  UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     version             INTEGER      NOT NULL DEFAULT 0,
     first_name          VARCHAR(255) NOT NULL,
     last_name           VARCHAR(255) NOT NULL,

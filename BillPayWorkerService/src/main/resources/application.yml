@@ -49,10 +49,7 @@ payments:
 
   batch:
     threshold: 1
-    
-    
 
-auth0:
-  audience: https://mockbank/api
-
-
+auth:
+  jwt:
+    audience: https://mockbank/api

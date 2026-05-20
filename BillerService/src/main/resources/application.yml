@@ -10,7 +10,6 @@ spring:
   application:
     name: biller-service
 
-
   datasource:
     url: jdbc:postgresql://localhost:5432/billerdb
     username: ${DB_USER:postgres}
@@ -33,7 +32,6 @@ logging:
     org.springframework.security.oauth2: DEBUG
     org.springframework.security: DEBUG
 
-    
-    
-auth0:
-  audience: https://mockbank/api
+auth:
+  jwt:
+    audience: https://mockbank/api

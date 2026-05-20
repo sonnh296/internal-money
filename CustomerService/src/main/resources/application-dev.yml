@@ -1,6 +1,8 @@
 spring:
   config:
     import: optional:classpath:application-dev-local.yml
+  application:
+    name: customer-service
   security:
     oauth2:
       resourceserver:
@@ -9,13 +11,13 @@ spring:
       client:
         registration:
           account-m2m:
-            provider: auth0
+            provider: mockbank-auth
             authorization-grant-type: client_credentials
             client-id: COElk9GHOmWS9L4MAQvscuxA49Cl4mfI
             client-secret: ${ACCOUNT_M2M_CLIENT_SECRET:XXXXXXXXXX}
             scope: admin:accounts,admin:accounts.write
         provider:
-          auth0:
+          mockbank-auth:
             token-uri: http://localhost:8094/oauth/token
   
   mail:
@@ -48,9 +50,6 @@ spring:
     baseline-version: 0
     clean-disabled: false
 
-application:
-  name: customer-service
-
 server:
   port: 8083
 
@@ -58,13 +57,17 @@ server:
 auth:
   service:
     url: http://localhost:8094
+  jwt:
+    audience: https://mockbank/api
 
 account:
   service:
     url: http://localhost:8084
 
-auth0:
-  audience: https://mockbank/api
+feign:
+  m2m:
+    client-registration-id: account-m2m
+    principal: customer-service
 
 app:
   mail:

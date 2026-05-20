@@ -9,7 +9,6 @@ export interface BillPayPayload {
   executionDate: string
   amount: { value: number; currency: string }
   note: string
-  pointsToRedeem?: number
 }
 
 export function createBillPayApi(payload: BillPayPayload, idemKey: string) {
@@ -20,8 +19,4 @@ export function createBillPayApi(payload: BillPayPayload, idemKey: string) {
 
 export function getPaymentApi(paymentId: string) {
   return client.get(`/api/v1/payments/${encodeURIComponent(paymentId)}`)
-}
-
-export function getMyRewardPointsApi() {
-  return client.get('/api/v1/rewards/me')
 }
