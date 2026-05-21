@@ -3,7 +3,6 @@ package com.mockbank.payment.service;
 import com.mockbank.commons.dto.account.PostingRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mockbank.payment.client.AccountM2MClient;
-import com.mockbank.payment.client.BillerInvoiceM2MClient;
 import com.mockbank.payment.domain.Payment;
 import com.mockbank.payment.domain.PaymentState;
 import com.mockbank.payment.domain.ProcessedEvent;
@@ -12,7 +11,6 @@ import com.mockbank.payment.repo.PaymentRepo;
 import com.mockbank.payment.repo.ProcessedEventRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
@@ -35,12 +33,12 @@ public class StatusConsumer {
   private final ProcessedEventRepo processed;
   private final ObjectMapper om;
   private final AccountM2MClient accountM2MClient;
-  private final BillerInvoiceM2MClient billerInvoiceClient;
   private final TransactionTemplate paymentTransactionTemplate;
   private final BillPayCompensationService compensation;
+  private final PaymentCompletionService completion;
 
   /**
-   * Saga POSTED: (1) TX → CAPTURING (2) HTTP capture + mark invoice (3) TX → POSTED + outbox.
+   * Saga POSTED: (1) TX → CAPTURING (2) HTTP capture + mark invoice (3) TX → POSTED.
    * Không debit trước khi ghi nhận CAPTURING — tránh tiền đã trừ mà payment vẫn FUNDS_HELD.
    */
   @RetryableTopic(
@@ -72,6 +70,20 @@ public class StatusConsumer {
       return;
     }
 
+    if (p.getState() == PaymentState.FAILED) {
+      log.warn("Bỏ qua POSTED — payment đã FAILED paymentId={}", p.getPaymentId());
+      markProcessed(evt);
+      return;
+    }
+
+    if (p.getState() == PaymentState.RECONCILIATION_REQUIRED) {
+      if (completion.tryCompleteInvoiceAndPost(p, evt.reason(), evt.eventId())) {
+        return;
+      }
+      throw new IllegalStateException(
+          "Payment still awaiting invoice reconciliation paymentId=" + p.getPaymentId());
+    }
+
     if (!ensureCapturingState(p, evt)) {
       return;
     }
@@ -83,37 +95,52 @@ public class StatusConsumer {
 
     try {
       captureHoldWithCb(p.getDebtorAccountId(), p.getPaymentId(), captureIdempotencyKey, posting);
+    } catch (feign.FeignException ex) {
+      if (ex.status() >= 400 && ex.status() < 500 && ex.status() != 408 && ex.status() != 429) {
+        compensateFailedCapture(p, evt, ex);
+      }
+      throw ex;
     } catch (Exception ex) {
-      compensateFailedCapture(p, evt, ex);
       throw ex;
     }
 
-    markInvoicePaid(p);
-    finalizePosted(evt, p);
+    try {
+      completion.markInvoicePaid(p);
+    } catch (Exception ex) {
+      completion.markReconciliationRequired(p.getPaymentId(), ex.getMessage());
+      log.warn("Debit OK nhưng mark invoice thất bại — chuyển RECONCILIATION_REQUIRED paymentId={}",
+          p.getPaymentId());
+      return;
+    }
+
+    completion.finalizeToPosted(p.getPaymentId(), evt.reason(), evt.eventId());
   }
 
   /**
-   * Chuyển FUNDS_HELD → CAPTURING trong TX ngắn trước mọi HTTP call tới Account/Biller.
+   * Chuyển trạng thái chờ settlement → CAPTURING trong TX ngắn trước mọi HTTP call tới Account/Biller.
    */
   private boolean ensureCapturingState(Payment p, BillpayStatusEvent evt) {
-    if (p.getState() == PaymentState.CAPTURING) {
+    if (p.getState() == PaymentState.CAPTURING
+        || p.getState() == PaymentState.RECONCILIATION_REQUIRED) {
       return true;
     }
-    if (p.getState() != PaymentState.FUNDS_HELD) {
+    if (!PaymentStateTransitions.canBeginCapture(p.getState())) {
       log.warn("Bỏ qua POSTED: trạng thái payment không hợp lệ state={} paymentId={}",
           p.getState(), p.getPaymentId());
+      markProcessed(evt);
       return false;
     }
 
     Boolean proceed = paymentTransactionTemplate.execute(status -> {
       Payment fresh = paymentRepo.findById(p.getPaymentId()).orElseThrow();
-      if (fresh.getState() == PaymentState.POSTED) {
+      if (PaymentStateTransitions.isTerminal(fresh.getState())) {
         return Boolean.FALSE;
       }
-      if (fresh.getState() == PaymentState.CAPTURING) {
+      if (fresh.getState() == PaymentState.CAPTURING
+          || fresh.getState() == PaymentState.RECONCILIATION_REQUIRED) {
         return Boolean.TRUE;
       }
-      if (fresh.getState() != PaymentState.FUNDS_HELD) {
+      if (!PaymentStateTransitions.canBeginCapture(fresh.getState())) {
         return Boolean.FALSE;
       }
       fresh.setState(PaymentState.CAPTURING);
@@ -124,39 +151,13 @@ public class StatusConsumer {
 
     if (Boolean.FALSE.equals(proceed)) {
       paymentRepo.findById(p.getPaymentId()).ifPresent(latest -> {
-        if (latest.getState() == PaymentState.POSTED) {
+        if (PaymentStateTransitions.isTerminal(latest.getState())) {
           markProcessed(evt);
         }
       });
       return false;
     }
     return true;
-  }
-
-  private void finalizePosted(BillpayStatusEvent evt, Payment p) {
-    paymentTransactionTemplate.execute(status -> {
-      Payment fresh = paymentRepo.findById(p.getPaymentId()).orElseThrow();
-      if (fresh.getState() == PaymentState.POSTED) {
-        if (!processed.existsByHandlerAndEventId("status", evt.eventId().toString())) {
-          processed.save(ProcessedEvent.builder()
-              .handler("status").eventId(evt.eventId().toString())
-              .processedAt(OffsetDateTime.now()).build());
-        }
-        return null;
-      }
-      if (fresh.getState() != PaymentState.CAPTURING) {
-        throw new IllegalStateException(
-            "Cannot finalize POSTED from state " + fresh.getState() + " paymentId=" + fresh.getPaymentId());
-      }
-      fresh.setState(PaymentState.POSTED);
-      fresh.setReason(evt.reason());
-      fresh.setUpdatedAt(OffsetDateTime.now());
-      paymentRepo.save(fresh);
-      processed.save(ProcessedEvent.builder()
-          .handler("status").eventId(evt.eventId().toString())
-          .processedAt(OffsetDateTime.now()).build());
-      return null;
-    });
   }
 
   /**
@@ -182,6 +183,11 @@ public class StatusConsumer {
 
   private void handleFailed(BillpayStatusEvent evt, Payment p) {
     if (p.getState() == PaymentState.FAILED || p.getState() == PaymentState.POSTED) {
+      markProcessed(evt);
+      return;
+    }
+    if (p.getState() == PaymentState.RECONCILIATION_REQUIRED) {
+      log.warn("Bỏ qua FAILED status — đã debit, đang reconciliation paymentId={}", p.getPaymentId());
       markProcessed(evt);
       return;
     }
@@ -223,35 +229,13 @@ public class StatusConsumer {
     });
   }
 
-  private void markInvoicePaid(Payment p) {
-    try {
-      UUID invoiceId = UUID.fromString(p.getInvoiceReference());
-      billerInvoiceClient.markPaid(invoiceId);
-      log.info("Marked invoice {} as PAID for paymentId={}", invoiceId, p.getPaymentId());
-    } catch (IllegalArgumentException e) {
-      log.warn("Invalid invoice reference on payment {}: {}", p.getPaymentId(), p.getInvoiceReference());
-    } catch (FeignException e) {
-      if (e.status() == 409) {
-        log.info("Invoice {} already PAID for paymentId={}", p.getInvoiceReference(), p.getPaymentId());
-        return;
-      }
-      log.error("Failed to mark invoice {} as PAID for payment {}: {}",
-          p.getInvoiceReference(), p.getPaymentId(), e.getMessage());
-      throw e;
-    } catch (Exception e) {
-      log.error("Failed to mark invoice {} as PAID for payment {}: {}",
-          p.getInvoiceReference(), p.getPaymentId(), e.getMessage());
-      throw e;
-    }
-  }
-
   @CircuitBreaker(name = "accountClient")
-  private void releaseHoldWithCb(UUID accountId, UUID holdId) {
+  public void releaseHoldWithCb(UUID accountId, UUID holdId) {
     accountM2MClient.releaseHold(accountId, holdId);
   }
 
   @CircuitBreaker(name = "accountClient")
-  private void captureHoldWithCb(UUID accountId, UUID holdId, String idempotencyKey, PostingRequest r) {
+  public void captureHoldWithCb(UUID accountId, UUID holdId, String idempotencyKey, PostingRequest r) {
     accountM2MClient.captureHoldAndDebit(accountId, holdId, idempotencyKey, r);
   }
 

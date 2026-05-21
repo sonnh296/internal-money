@@ -142,6 +142,14 @@ public class AccountController {
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 
+    @GetMapping("/accounts/{id:" + ACCOUNT_ID + "}/holds/{holdId:" + HOLD_ID + "}")
+    @PreAuthorize("hasAnyAuthority('SCOPE_fdx:accounts.read','SCOPE_admin:accounts')")
+    public HoldResponse getHold(
+            @PathVariable("id") UUID id,
+            @PathVariable("holdId") UUID holdId) {
+        return service.getHold(id, holdId);
+    }
+
     @PostMapping("/accounts/{id:" + ACCOUNT_ID + "}/holds/{holdId:" + HOLD_ID + "}/capture")
     @PreAuthorize("hasAnyAuthority('SCOPE_fdx:accounts.write','SCOPE_admin:accounts')")
     public ResponseEntity<AccountResponse> captureHold(

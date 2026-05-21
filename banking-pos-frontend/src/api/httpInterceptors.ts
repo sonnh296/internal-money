@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import { env } from '../config/env'
 import { getClient } from './httpClient'
 import { useAdminAuthStore } from '../stores/adminAuth.store'
 import { useNotifyStore } from '../stores/notify.store'
@@ -11,7 +12,14 @@ const services: ServiceName[] = ['auth', 'customer', 'account', 'payment', 'bill
 
 function isAuthEndpoint(url?: string): boolean {
   if (!url) return false
-  return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout')
+  if (url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout')) {
+    return true
+  }
+  // Cookie mode: /me dùng HttpOnly cookie, không refresh bằng body token
+  if (env.useAuthCookies && url.includes('/auth/me')) {
+    return true
+  }
+  return false
 }
 
 function sessionInvalidMessage(error: AxiosError): boolean {
@@ -49,10 +57,21 @@ export function setupHttpInterceptors(): void {
         try {
           if (portal === 'admin') {
             await adminAuth.refresh()
-            config.headers.Authorization = `Bearer ${adminAuth.accessToken}`
           } else {
             await userAuth.refresh()
+          }
+          if (env.useAuthCookies) {
+            delete config.headers.Authorization
+          } else if (portal === 'admin') {
+            if (adminAuth.accessToken) {
+              config.headers.Authorization = `Bearer ${adminAuth.accessToken}`
+            } else {
+              delete config.headers.Authorization
+            }
+          } else if (userAuth.accessToken) {
             config.headers.Authorization = `Bearer ${userAuth.accessToken}`
+          } else {
+            delete config.headers.Authorization
           }
           return client(config)
         } catch (refreshError) {

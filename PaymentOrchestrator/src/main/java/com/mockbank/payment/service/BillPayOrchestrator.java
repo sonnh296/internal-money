@@ -81,9 +81,26 @@ public class BillPayOrchestrator {
       return paymentTransactionTemplate.execute(status ->
           persistPaymentAndOutbox(req, idemKey, holdId, holdAmount));
     } catch (RuntimeException ex) {
+      var replay = findExistingPaymentAfterPersistFailure(idemKey, holdId);
+      if (replay.isPresent()) {
+        log.info("Idempotent replay after persist race idemKey={} paymentId={}", idemKey, replay.get().getPaymentId());
+        return acceptedResponse(replay.get());
+      }
       compensation.releaseHoldAfterFailure(req.debtorAccountId(), holdId);
       throw ex;
     }
+  }
+
+  /**
+   * Request song song cùng Idempotency-Key: thread thua có thể fail insert — không release hold
+   * nếu payment đã được thread kia ghi nhận.
+   */
+  private java.util.Optional<Payment> findExistingPaymentAfterPersistFailure(String idemKey, UUID holdId) {
+    var byKey = paymentRepo.findByIdempotencyKey(idemKey);
+    if (byKey.isPresent()) {
+      return byKey;
+    }
+    return paymentRepo.findById(holdId);
   }
 
   private PaymentAcceptedResponse persistPaymentAndOutbox(

@@ -1,20 +1,48 @@
 import type { StoredAuthPayload } from '../types/api.types'
+import { env } from '../config/env'
+
+/** Cookie mode: không lưu JWT; legacy: sessionStorage (không dùng localStorage). */
+function storage(): Storage {
+  return sessionStorage
+}
 
 export function loadAuth(key: string): StoredAuthPayload | null {
   try {
-    const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as StoredAuthPayload) : null
+    const raw = storage().getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as StoredAuthPayload
+    if (env.useAuthCookies) {
+      return {
+        accessToken: '',
+        refreshToken: '',
+        expiresIn: parsed.expiresIn ?? 0,
+        issuedAt: parsed.issuedAt ?? 0,
+        profile: parsed.profile ?? { email: '', customerId: '', scopes: [] }
+      }
+    }
+    return parsed
   } catch {
     return null
   }
 }
 
 export function saveAuth(key: string, payload: StoredAuthPayload): void {
-  localStorage.setItem(key, JSON.stringify(payload))
+  if (env.useAuthCookies) {
+    storage().setItem(
+      key,
+      JSON.stringify({
+        expiresIn: payload.expiresIn,
+        issuedAt: payload.issuedAt,
+        profile: payload.profile
+      })
+    )
+    return
+  }
+  storage().setItem(key, JSON.stringify(payload))
 }
 
 export function clearAuth(key: string): void {
-  localStorage.removeItem(key)
+  storage().removeItem(key)
 }
 
 export function decodeJwtClaims(token: string): Record<string, unknown> {

@@ -144,7 +144,11 @@ public class CustomerService {
 			} catch (Exception e) {
 				log.warn("Bank account provisioning failed for customer {}: {}", c.getExternalId(), e.getMessage());
 			}
-			emailNotificationService.sendKycVerified(c.getEmail(), c.getFirstName(), temporaryPassword);
+			try {
+				emailNotificationService.sendKycVerified(c.getEmail(), c.getFirstName(), temporaryPassword);
+			} catch (Exception e) {
+				log.warn("KYC verified email failed for {}: {}", c.getEmail(), e.getMessage());
+			}
 		} else if ("REJECTED".equalsIgnoreCase(kycStatus)) {
 			c.setKycStatus(KycStatus.REJECTED);
 			repository.save(c);

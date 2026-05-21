@@ -20,6 +20,12 @@ import org.springframework.web.bind.annotation.*;
 public interface AccountM2MClient {
 
    
+	  @GetMapping("/api/v1/accounts/{accountId}/holds/{holdId}")
+	  HoldResponse getHold(
+	      @PathVariable("accountId") UUID accountId,
+	      @PathVariable("holdId") UUID holdId
+	  );
+
 	  @PostMapping("/api/v1/accounts/{accountId}/holds/{holdId}/release")
 	  HoldResponse releaseHold(
 	      @PathVariable("accountId") UUID accountId,

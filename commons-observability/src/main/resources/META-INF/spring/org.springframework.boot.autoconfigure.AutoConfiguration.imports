@@ -1,1 +1,1 @@
-com.commons.observability.autoconfig.WebLoggingAutoConfiguration
+com.mockbank.commons.observability.autoconfig.WebLoggingAutoConfiguration

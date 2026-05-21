@@ -577,6 +577,15 @@ public class AccountService {
 				status -> captureHoldAndDebitInTransaction(accountId, holdId, r, idempotencyKey.trim())));
 	}
 
+	public HoldResponse getHold(UUID accountId, UUID holdId) {
+		AccountHold h = holdRepo.findById(holdId)
+				.orElseThrow(() -> new com.mockbank.commons.dto.exception.ResourceNotFoundException("hold", holdId));
+		if (!h.getAccountId().equals(accountId)) {
+			throw new com.mockbank.commons.dto.exception.BadRequestException("Hold does not belong to this account");
+		}
+		return new HoldResponse(h.getId(), h.getAmount(), h.getStatus(), h.getCreatedAt(), h.getReleaseAt());
+	}
+
 	public HoldResponse releaseHold(UUID accountId, UUID holdId, String reason) {
 		return withOptimisticRetry(() -> transactionTemplate.execute(
 				status -> releaseHoldInTransaction(accountId, holdId, reason)));

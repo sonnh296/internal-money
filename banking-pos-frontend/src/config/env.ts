@@ -2,10 +2,18 @@ const required = (name: string, fallback: string): string => {
   return (import.meta.env[name] as string | undefined) ?? fallback
 }
 
+const truthy = (name: string): boolean => {
+  const v = import.meta.env[name] as string | undefined
+  return v === 'true' || v === '1'
+}
+
 export const env = {
   authBaseUrl: required('VITE_AUTH_URL', '/auth-api'),
   customerBaseUrl: required('VITE_CUSTOMER_URL', '/customer-api'),
   accountBaseUrl: required('VITE_ACCOUNT_URL', '/account-api'),
   paymentBaseUrl: required('VITE_PAYMENT_URL', '/payment-api'),
-  billerBaseUrl: required('VITE_BILLER_URL', '/biller-api')
+  billerBaseUrl: required('VITE_BILLER_URL', '/biller-api'),
+  /** HttpOnly cookie từ AuthUser; API qua Gateway để gắn Bearer */
+  useAuthCookies: truthy('VITE_AUTH_COOKIES'),
+  proxyViaGateway: truthy('VITE_PROXY_VIA_GATEWAY')
 }

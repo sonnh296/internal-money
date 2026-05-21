@@ -2,12 +2,14 @@ import axios, { type AxiosInstance } from 'axios'
 import { env } from '../config/env'
 import type { PortalKind, ServiceName } from '../types/api.types'
 
+const axiosDefaults = env.useAuthCookies ? { withCredentials: true } : {}
+
 const clients: Record<ServiceName, AxiosInstance> = {
-  auth: axios.create({ baseURL: env.authBaseUrl }),
-  customer: axios.create({ baseURL: env.customerBaseUrl }),
-  account: axios.create({ baseURL: env.accountBaseUrl }),
-  payment: axios.create({ baseURL: env.paymentBaseUrl }),
-  biller: axios.create({ baseURL: env.billerBaseUrl })
+  auth: axios.create({ baseURL: env.authBaseUrl, ...axiosDefaults }),
+  customer: axios.create({ baseURL: env.customerBaseUrl, ...axiosDefaults }),
+  account: axios.create({ baseURL: env.accountBaseUrl, ...axiosDefaults }),
+  payment: axios.create({ baseURL: env.paymentBaseUrl, ...axiosDefaults }),
+  biller: axios.create({ baseURL: env.billerBaseUrl, ...axiosDefaults })
 }
 
 type TokenResolver = () => { token: string; portal: PortalKind | null }
@@ -21,10 +23,11 @@ export function configureTokenResolver(fn: TokenResolver): void {
 for (const client of Object.values(clients)) {
   client.interceptors.request.use((config) => {
     const { token, portal } = resolver()
-    if (token) {
+    if (token && !env.useAuthCookies) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    if (portal) {
+    const explicitPortal = config.headers['X-Portal']
+    if (!explicitPortal && portal) {
       config.headers['X-Portal'] = portal
     }
     return config

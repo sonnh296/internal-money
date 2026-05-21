@@ -51,8 +51,12 @@ public class SubmittedConsumer {
     List<Payment> list = paymentRepo.findAllByBatchId(UUID.fromString(evt.getBatchId()));
     var now = OffsetDateTime.now();
     for (var p : list) {
-      p.setState(com.mockbank.payment.domain.PaymentState.SUBMITTED);
-      p.setUpdatedAt(now);
+      if (PaymentStateTransitions.applySubmitted(p)) {
+        p.setUpdatedAt(now);
+      } else {
+        log.info("Bỏ qua submitted — không hạ state paymentId={} current={}",
+            p.getPaymentId(), p.getState());
+      }
     }
     paymentRepo.saveAll(list);
 

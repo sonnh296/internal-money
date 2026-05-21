@@ -1,7 +1,9 @@
 import axios from 'axios'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { env } from '../config/env'
 import { loginApi, logoutApi, refreshApi } from '../api/auth.api'
+import { fetchAuthProfile } from './authProfileSync'
 import type { AuthProfile, TokenResponseDto } from '../types/api.types'
 import {
   clearAuth,
@@ -23,7 +25,9 @@ export const useUserAuthStore = defineStore('userAuth', () => {
   const loading = ref(false)
   const error = ref('')
 
-  const isAuthenticated = computed(() => Boolean(accessToken.value))
+  const isAuthenticated = computed(() =>
+    env.useAuthCookies ? Boolean(profile.value.email) : Boolean(accessToken.value)
+  )
   const expiresAt = computed(() =>
     issuedAt.value && expiresIn.value ? issuedAt.value + expiresIn.value * 1000 : 0
   )
@@ -48,11 +52,20 @@ export const useUserAuthStore = defineStore('userAuth', () => {
     })
   }
 
+  async function syncProfileFromServer(): Promise<void> {
+    profile.value = await fetchAuthProfile('user')
+    issuedAt.value = Date.now()
+    persist()
+  }
+
   function applyToken(data: TokenResponseDto, email?: string): void {
-    accessToken.value = data.access_token
-    refreshToken.value = data.refresh_token
+    accessToken.value = data.access_token ?? ''
+    refreshToken.value = data.refresh_token ?? ''
     expiresIn.value = data.expires_in
     issuedAt.value = Date.now()
+    if (env.useAuthCookies) {
+      return
+    }
     const scopes = extractScopes(data.access_token)
     const tokenCustomerId = extractCustomerId(data.access_token)
     profile.value = {
@@ -72,8 +85,11 @@ export const useUserAuthStore = defineStore('userAuth', () => {
     loading.value = true
     error.value = ''
     try {
-      const { data } = await loginApi(payload)
+      const { data } = await loginApi(payload, 'user')
       applyToken(data as TokenResponseDto, payload.email)
+      if (env.useAuthCookies) {
+        await syncProfileFromServer()
+      }
       return data as TokenResponseDto
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -88,9 +104,12 @@ export const useUserAuthStore = defineStore('userAuth', () => {
   }
 
   async function refresh(): Promise<TokenResponseDto | null> {
-    if (!refreshToken.value) return null
-    const { data } = await refreshApi(refreshToken.value)
+    if (!env.useAuthCookies && !refreshToken.value) return null
+    const { data } = await refreshApi(refreshToken.value, 'user')
     applyToken(data as TokenResponseDto)
+    if (env.useAuthCookies) {
+      await syncProfileFromServer()
+    }
     return data as TokenResponseDto
   }
 
@@ -102,12 +121,10 @@ export const useUserAuthStore = defineStore('userAuth', () => {
     issuedAt.value = 0
     profile.value = { email: '', customerId: '', scopes: [] }
     clearAuth(STORAGE_KEY)
-    if (stale) {
-      try {
-        await logoutApi(stale)
-      } catch {
-        // swallow
-      }
+    try {
+      await logoutApi(stale, 'user')
+    } catch {
+      // swallow
     }
   }
 

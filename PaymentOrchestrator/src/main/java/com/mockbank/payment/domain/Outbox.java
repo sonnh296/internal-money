@@ -21,7 +21,7 @@ public class Outbox {
   @Column(name="message_key", nullable=false, length=120)
   private UUID key;        // Kafka message key (partitioning, ordering)
 
-  @Lob @Column(nullable=false)
+  @Column(nullable=false, columnDefinition = "TEXT")
   private String payloadJson; // Serialized event JSON (schema owned by your service)
 
   @Column(nullable=false, length=20)

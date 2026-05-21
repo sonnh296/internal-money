@@ -39,6 +39,11 @@ cors:
   allowed-methods: "GET,POST,PUT,PATCH,DELETE,OPTIONS"
 
 auth:
+  cookies:
+    enabled: true
+    secure: false
+    same-site: Lax
+    path: /
   jwt:
     issuer: http://localhost:8094
     audience: https://mockbank/api

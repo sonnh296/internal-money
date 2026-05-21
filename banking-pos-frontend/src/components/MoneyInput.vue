@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import Decimal from 'decimal.js-light'
 
 const props = withDefaults(
   defineProps<{
-    modelValue: number
+    modelValue: number | string
     placeholder?: string
     min?: number
     allowDecimals?: boolean
@@ -16,24 +17,36 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'update:modelValue': [number]
+  'update:modelValue': [number | string]
 }>()
 
 const display = ref('')
 
-function formatValue(value: number): string {
-  if (!Number.isFinite(value) || value === 0) return ''
-  if (props.allowDecimals) {
-    return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
+function formatValue(value: number | string): string {
+  try {
+    const val = new Decimal(value || 0)
+    if (!val.isFinite() || val.isZero()) return ''
+    if (props.allowDecimals) {
+      return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(val.toNumber())
+    }
+    return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(val.round().toNumber())
+  } catch {
+    return ''
   }
-  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.round(value))
 }
 
-function parseValue(raw: string): number {
+function parseValue(raw: string): string {
   const normalized = raw.trim().replace(/\s/g, '').replace(/\./g, '').replace(',', '.')
-  if (!normalized) return 0
-  const parsed = props.allowDecimals ? Number.parseFloat(normalized) : Number.parseInt(normalized, 10)
-  return Number.isFinite(parsed) ? parsed : 0
+  if (!normalized) return '0'
+  try {
+    const parsed = new Decimal(normalized)
+    if (!props.allowDecimals) {
+      return parsed.round().toString()
+    }
+    return parsed.toString()
+  } catch {
+    return '0'
+  }
 }
 
 watch(
@@ -55,9 +68,13 @@ function onInput(event: Event) {
   } else {
     raw = raw.replace(/[^\d]/g, '')
   }
-  const amount = parseValue(raw)
-  display.value = amount > 0 ? formatValue(amount) : raw.replace(/[^\d.,]/g, '')
-  emit('update:modelValue', amount)
+  const amountStr = parseValue(raw)
+  let valToEmit: string | number = amountStr
+  if (typeof props.modelValue === 'number') {
+    valToEmit = Number(amountStr)
+  }
+  display.value = new Decimal(amountStr || 0).greaterThan(0) ? formatValue(amountStr) : raw.replace(/[^\d.,]/g, '')
+  emit('update:modelValue', valToEmit)
 }
 </script>
 

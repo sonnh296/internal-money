@@ -6,16 +6,18 @@ import com.mockbank.commons.dto.events.billpay.Pain002Message;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
 /**
- * Dev/demo bridge: consumes mock pain.002 from BillPayWorker and drives payment settlement
- * when SettlementService is not running.
+ * Dev/demo bridge: consumes mock pain.002 khi SettlementService không chạy.
+ * Tắt mặc định — bật bằng payments.pain002-bridge.enabled=true (không chạy song song Settlement).
  */
 @Component
+@ConditionalOnProperty(name = "payments.pain002-bridge.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class Pain002BridgeConsumer {

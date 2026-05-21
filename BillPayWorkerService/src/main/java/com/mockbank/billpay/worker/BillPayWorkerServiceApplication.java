@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication(scanBasePackages = {"com.commons", "com.mockbank.billpay.worker"})
+@SpringBootApplication(scanBasePackages = {"com.mockbank.commons", "com.mockbank.billpay.worker"})
 @EnableKafka
 @EnableScheduling
 public class BillPayWorkerServiceApplication {

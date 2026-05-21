@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Decimal from 'decimal.js-light'
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
   createCustomerApi,
@@ -35,9 +36,20 @@ const showCreateForm = ref(false)
 const emailNotice = ref<{ type: 'verify' | 'reject'; email: string } | null>(null)
 const postingPanel = ref<{ row: CustomerRow; account: AccountResponse } | null>(null)
 const postingDraft = reactive({
-  amount: 0,
+  amount: '',
   type: 'CREDIT' as 'CREDIT' | 'DEBIT',
   reason: ''
+})
+
+const canSubmitPosting = computed(() => {
+  if (running.value) return false
+  try {
+    const amt = new Decimal(postingDraft.amount || 0)
+    if (!amt.isFinite() || amt.lte(0)) return false
+  } catch {
+    return false
+  }
+  return postingDraft.reason.trim().length > 0
 })
 
 const createForm = reactive<CustomerCreatePayload>({
@@ -164,7 +176,7 @@ async function activateAccount(account: AccountResponse) {
 
 function openPosting(row: CustomerRow, account: AccountResponse) {
   postingPanel.value = { row, account }
-  postingDraft.amount = 0
+  postingDraft.amount = ''
   postingDraft.type = 'CREDIT'
   postingDraft.reason = ''
 }
@@ -185,18 +197,20 @@ async function openPostingForCustomer(row: CustomerRow) {
 async function submitPosting() {
   if (!postingPanel.value) return
   const { row, account } = postingPanel.value
-  if (postingDraft.amount <= 0 || !postingDraft.reason.trim()) return
+  const amount = new Decimal(postingDraft.amount || 0)
+  if (!canSubmitPosting.value || amount.lte(0)) return
   const isCredit = postingDraft.type === 'CREDIT'
   const label = isCredit ? 'Nạp' : 'Rút'
-  if (!confirm(`${label} ${postingDraft.amount} ${account.currency} vào tài khoản ${account.accountNumber || account.id}?`)) {
+  const amountNum = amount.toNumber()
+  if (!confirm(`${label} ${amountNum} ${account.currency} vào tài khoản ${account.accountNumber || account.id}?`)) {
     return
   }
   const resp = await run(
     label + ' tiền',
     () =>
       isCredit
-        ? creditApi(account.id, { amount: postingDraft.amount, reason: postingDraft.reason.trim() }, account.version)
-        : debitApi(account.id, { amount: postingDraft.amount, reason: postingDraft.reason.trim() }, account.version),
+        ? creditApi(account.id, { amount: amountNum, reason: postingDraft.reason.trim() }, account.version)
+        : debitApi(account.id, { amount: amountNum, reason: postingDraft.reason.trim() }, account.version),
     { successToast: `Đã ${label.toLowerCase()} tiền. Đã gửi email thông báo cho khách hàng (nếu SMTP đã cấu hình).` }
   )
   const updated = resp.data as AccountResponse
@@ -204,7 +218,7 @@ async function submitPosting() {
   account.version = updated.version
   await notifyBalanceAdjustmentApi({
     customerId: row.customer.externalId,
-    amount: postingDraft.amount,
+    amount: amountNum,
     type: postingDraft.type,
     reason: postingDraft.reason.trim(),
     balanceAfter: Number(updated.balance)
@@ -494,7 +508,7 @@ onMounted(loadAll)
         </div>
         <div class="actions">
           <button
-            :disabled="running || postingDraft.amount <= 0 || !postingDraft.reason.trim()"
+            :disabled="!canSubmitPosting"
             @click="submitPosting">
             Xác nhận
           </button>

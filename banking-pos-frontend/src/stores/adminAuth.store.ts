@@ -1,7 +1,9 @@
 import axios from 'axios'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { env } from '../config/env'
 import { loginApi, logoutApi, refreshApi } from '../api/auth.api'
+import { fetchAuthProfile } from './authProfileSync'
 import { ADMIN_SCOPE_HINTS } from '../constants/app.constants'
 import type { AuthProfile, TokenResponseDto } from '../types/api.types'
 import {
@@ -25,13 +27,19 @@ export const useAdminAuthStore = defineStore('adminAuth', () => {
   const loading = ref(false)
   const error = ref('')
 
-  const isAuthenticated = computed(() => Boolean(accessToken.value))
+  const isAuthenticated = computed(() =>
+    env.useAuthCookies ? Boolean(profile.value.email) : Boolean(accessToken.value)
+  )
   const isAdmin = computed(() => {
-    if (!accessToken.value) return false
+    if (!isAuthenticated.value) return false
     if (profile.value.customerId.startsWith('admin-')) return true
     return profile.value.scopes.some((s) => ADMIN_SCOPE_HINTS.includes(s as never))
   })
-  const role = computed(() => extractRole(accessToken.value))
+  const role = computed(() =>
+    env.useAuthCookies
+      ? (profile.value.scopes.includes('SUPER_ADMIN') ? 'SUPER_ADMIN' : 'ADMIN')
+      : extractRole(accessToken.value)
+  )
   const isSuperAdmin = computed(() => role.value === 'SUPER_ADMIN')
   const expiresAt = computed(() =>
     issuedAt.value && expiresIn.value ? issuedAt.value + expiresIn.value * 1000 : 0
@@ -57,11 +65,24 @@ export const useAdminAuthStore = defineStore('adminAuth', () => {
     })
   }
 
+  async function syncProfileFromServer(): Promise<void> {
+    profile.value = await fetchAuthProfile('admin')
+    issuedAt.value = Date.now()
+    persist()
+  }
+
   function applyToken(data: TokenResponseDto, email?: string): void {
-    accessToken.value = data.access_token
-    refreshToken.value = data.refresh_token
+    accessToken.value = data.access_token ?? ''
+    refreshToken.value = data.refresh_token ?? ''
     expiresIn.value = data.expires_in
     issuedAt.value = Date.now()
+    if (env.useAuthCookies) {
+      if (email) {
+        profile.value.email = email
+      }
+      persist()
+      return
+    }
     const scopes = extractScopes(data.access_token)
     const tokenCustomerId = extractCustomerId(data.access_token)
     profile.value = {
@@ -76,8 +97,11 @@ export const useAdminAuthStore = defineStore('adminAuth', () => {
     loading.value = true
     error.value = ''
     try {
-      const { data } = await loginApi(payload)
+      const { data } = await loginApi(payload, 'admin')
       applyToken(data as TokenResponseDto, payload.email)
+      if (env.useAuthCookies) {
+        await syncProfileFromServer()
+      }
       return data as TokenResponseDto
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -92,9 +116,12 @@ export const useAdminAuthStore = defineStore('adminAuth', () => {
   }
 
   async function refresh(): Promise<TokenResponseDto | null> {
-    if (!refreshToken.value) return null
-    const { data } = await refreshApi(refreshToken.value)
+    if (!env.useAuthCookies && !refreshToken.value) return null
+    const { data } = await refreshApi(refreshToken.value, 'admin')
     applyToken(data as TokenResponseDto)
+    if (env.useAuthCookies) {
+      await syncProfileFromServer()
+    }
     return data as TokenResponseDto
   }
 
@@ -106,12 +133,10 @@ export const useAdminAuthStore = defineStore('adminAuth', () => {
     issuedAt.value = 0
     profile.value = { email: '', customerId: '', scopes: [] }
     clearAuth(STORAGE_KEY)
-    if (stale) {
-      try {
-        await logoutApi(stale)
-      } catch {
-        // swallow
-      }
+    try {
+      await logoutApi(stale, 'admin')
+    } catch {
+      // swallow
     }
   }
 

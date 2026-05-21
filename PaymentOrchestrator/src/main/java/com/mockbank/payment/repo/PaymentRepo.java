@@ -15,6 +15,10 @@ public interface PaymentRepo extends JpaRepository<Payment, UUID> {
 
   List<Payment> findByStateAndUpdatedAtBefore(PaymentState state, OffsetDateTime updatedAt);
 
+  List<Payment> findByStateInAndUpdatedAtBefore(Collection<PaymentState> states, OffsetDateTime updatedAt);
+
+  List<Payment> findByState(PaymentState state);
+
   @Modifying
   @Query("update Payment p set p.state=?2, p.updatedAt=current_timestamp where p.paymentId=?1")
   int updateState(String paymentId, PaymentState state);

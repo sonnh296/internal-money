@@ -1,16 +1,21 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import Decimal from 'decimal.js-light'
 import { listMyInvoicesApi } from '../../api/biller.api'
 import { getMyAccountApi } from '../../api/account.api'
 import { createBillPayApi, getPaymentApi } from '../../api/payment.api'
 import { useApiAction } from '../../composables/useApiAction'
 import { useNotifyStore } from '../../stores/notify.store'
 import EmptyState from '../../components/EmptyState.vue'
+import ConfirmModal from '../../components/ConfirmModal.vue'
 import type { AccountResponse } from '../../types/api.types'
 
 const notify = useNotifyStore()
 const { run, running } = useApiAction()
+
+let isMounted = false
+const confirmModal = ref<InstanceType<typeof ConfirmModal> | null>(null)
 
 interface Invoice {
   id: string
@@ -32,16 +37,16 @@ const selectedInvoice = computed(() => pendingInvoices.value.find((i) => i.id ==
 const totalPending = computed(() => pendingInvoices.value.length)
 
 const availableForPay = computed(() => {
-  if (!myAccount.value) return 0
+  if (!myAccount.value) return new Decimal(0)
   const avail = myAccount.value.availableBalance
-  if (avail != null && Number.isFinite(Number(avail))) return Number(avail)
-  const holds = Number(myAccount.value.totalHolds ?? 0)
-  return Number(myAccount.value.balance ?? 0) - holds
+  if (avail != null) return new Decimal(avail)
+  const holds = new Decimal(myAccount.value.totalHolds || 0)
+  return new Decimal(myAccount.value.balance || 0).minus(holds)
 })
 
 const canPay = computed(() => {
   if (!myAccount.value || !selectedInvoice.value) return false
-  return Number(selectedInvoice.value.amount) <= availableForPay.value
+  return new Decimal(selectedInvoice.value.amount || 0).lte(availableForPay.value)
 })
 
 async function load() {
@@ -49,6 +54,7 @@ async function load() {
     run('Lấy hóa đơn', () => listMyInvoicesApi(), { silent: true }),
     run('Lấy tài khoản', () => getMyAccountApi(), { silent: true }).catch(() => ({ data: null }))
   ])
+  if (!isMounted) return
   const invoiceData = invoiceResp.data as Invoice[] | { content?: Invoice[] }
   if (Array.isArray(invoiceData)) {
     invoices.value = invoiceData
@@ -83,6 +89,11 @@ async function waitForPaymentFinal(paymentId: string): Promise<'POSTED' | 'FAILE
     await sleep(1500)
   }
   return 'TIMEOUT'
+}
+
+function confirmPay() {
+  if (!canPay.value) return
+  confirmModal.value?.open()
 }
 
 async function paySelected() {
@@ -137,15 +148,38 @@ function isOverdue(dueDate: string): boolean {
   return new Date(dueDate) < new Date()
 }
 
-function formatMoney(currency: string, value: number): string {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: currency || 'VND' }).format(value)
+function formatMoney(currency: string, value: number | string | Decimal): string {
+  try {
+    const val = new Decimal(value || 0).toNumber()
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: currency || 'VND' }).format(val)
+  } catch {
+    return '0'
+  }
 }
 
-onMounted(load)
+onMounted(() => {
+  isMounted = true
+  load()
+})
+
+onUnmounted(() => {
+  isMounted = false
+})
 </script>
 
 <template>
   <div class="stack">
+    <ConfirmModal 
+      ref="confirmModal" 
+      title="Xác nhận thanh toán hóa đơn" 
+      @confirm="paySelected"
+    >
+      <div v-if="selectedInvoice">
+        <p>Gói dịch vụ: <strong>{{ selectedInvoice.packageName }}</strong></p>
+        <p>Số tiền: <strong>{{ formatMoney(selectedInvoice.currency, selectedInvoice.amount) }}</strong></p>
+        <p>Mã hóa đơn: {{ selectedInvoice.id }}</p>
+      </div>
+    </ConfirmModal>
     <section class="card">
       <div class="row-between">
         <div>
@@ -163,8 +197,8 @@ onMounted(load)
       <div v-if="myAccount" class="hint" style="margin-top:12px;">
         Số tài khoản: <span class="kbd">{{ myAccount.accountNumber }}</span>
         · Số dư khả dụng: <strong>{{ formatMoney(myAccount.currency, availableForPay) }}</strong>
-        <span v-if="Number(myAccount.totalHolds ?? 0) > 0" class="muted">
-          (tổng {{ formatMoney(myAccount.currency, Number(myAccount.balance)) }}, giữ {{ formatMoney(myAccount.currency, Number(myAccount.totalHolds)) }})
+        <span v-if="new Decimal(myAccount.totalHolds || 0).gt(0)" class="muted">
+          (tổng {{ formatMoney(myAccount.currency, myAccount.balance || 0) }}, giữ {{ formatMoney(myAccount.currency, myAccount.totalHolds || 0) }})
         </span>
       </div>
       <p v-else class="hint" style="margin-top:12px; color:#b45309;">
@@ -187,7 +221,7 @@ onMounted(load)
         Số tiền thanh toán: <strong>{{ formatMoney(selectedInvoice.currency, Number(selectedInvoice.amount)) }}</strong>
       </p>
       <div class="actions">
-        <button :disabled="running || !canPay" @click="paySelected">Thanh toán</button>
+        <button :disabled="running || !canPay" @click="confirmPay">Thanh toán</button>
       </div>
     </section>
 
@@ -219,7 +253,7 @@ onMounted(load)
                   v-if="inv.status === 'PENDING' && myAccount"
                   class="small"
                   :disabled="running"
-                  @click.stop="selectInvoice(inv); paySelected()"
+                  @click.stop="selectInvoice(inv); confirmPay()"
                 >
                   Thanh toán
                 </button>

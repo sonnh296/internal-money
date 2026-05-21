@@ -23,7 +23,7 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:sonnh296@gmail.com}
+    username: ${MAIL_USERNAME:son29062002@gmail.com}
     password: ${MAIL_PASSWORD}
     properties:
       mail.smtp.auth: true
@@ -71,6 +71,7 @@ feign:
 
 app:
   mail:
-    from: ${MAIL_FROM:sonnh296@gmail.com}
-    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:noreply@mockbank.local}
+    # Local dev: chỉ log email ra console; bật SMTP thật bằng MAIL_ENABLED=true + MAIL_PASSWORD
+    enabled: ${MAIL_ENABLED:false}
 

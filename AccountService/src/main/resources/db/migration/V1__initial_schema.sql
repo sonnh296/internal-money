@@ -114,7 +114,7 @@ BEGIN
     WHERE transaction_group_id = NEW.transaction_group_id;
 
     IF balance != 0 THEN
-        RAISE EXCEPTION 'Ledger out of balance for group %%: difference is %%', NEW.transaction_group_id, balance;
+        RAISE EXCEPTION 'Ledger out of balance for group %: difference is %', NEW.transaction_group_id, balance;
     END IF;
 
     RETURN NEW;

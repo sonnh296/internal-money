@@ -12,6 +12,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -48,6 +50,16 @@ class StatusConsumerTest {
     private BillPayCompensationService compensation;
     private StatusConsumer consumer;
 
+    private List<PaymentState> recordSaveStates() {
+        List<PaymentState> sequence = new ArrayList<>();
+        Mockito.doAnswer(invocation -> {
+            Payment saved = invocation.getArgument(0);
+            sequence.add(saved.getState());
+            return saved;
+        }).when(paymentRepo).save(Mockito.any());
+        return sequence;
+    }
+
     @BeforeEach
     void setUp() {
         paymentRepo = Mockito.mock(PaymentRepo.class);
@@ -61,8 +73,10 @@ class StatusConsumerTest {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(Mockito.mock(TransactionStatus.class));
         });
+        PaymentCompletionService completion = new PaymentCompletionService(
+                paymentRepo, processedEventRepo, billerInvoiceClient, paymentTransactionTemplate);
         consumer = new StatusConsumer(paymentRepo, processedEventRepo, objectMapper, accountM2MClient,
-                billerInvoiceClient, paymentTransactionTemplate, compensation);
+                paymentTransactionTemplate, compensation, completion);
     }
 
     @Test
@@ -94,15 +108,17 @@ class StatusConsumerTest {
                 any(PostingRequest.class)))
                 .thenReturn(new AccountResponse(accountId, "cust-123", "900000001", null, null, null, "CAD",
                         null, null, new BigDecimal("50.00"), null, 1, null, null));
+        List<PaymentState> states = recordSaveStates();
 
         consumer.onMessage(message);
 
-        InOrder order = inOrder(paymentRepo, accountM2MClient, billerInvoiceClient);
-        order.verify(paymentRepo).save(Mockito.argThat(p -> p.getState() == PaymentState.CAPTURING));
+        assertEquals(PaymentState.CAPTURING, states.get(0));
+        assertEquals(PaymentState.POSTED, states.get(states.size() - 1));
+
+        InOrder order = inOrder(accountM2MClient, billerInvoiceClient);
         order.verify(accountM2MClient).captureHoldAndDebit(eq(accountId), eq(paymentId), eq(paymentId + ":DEBIT"),
                 any(PostingRequest.class));
         order.verify(billerInvoiceClient).markPaid(invoiceId);
-        order.verify(paymentRepo).save(Mockito.argThat(p -> p.getState() == PaymentState.POSTED));
         verify(processedEventRepo).save(any(ProcessedEvent.class));
         verify(compensation, never()).releaseHoldAfterFailure(any(), any());
     }
@@ -133,13 +149,15 @@ class StatusConsumerTest {
         when(paymentRepo.findById(paymentId)).thenReturn(Optional.of(payment), Optional.of(payment), Optional.of(payment));
         when(accountM2MClient.captureHoldAndDebit(any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("insufficient balance"));
+        List<PaymentState> states = recordSaveStates();
 
         try {
             consumer.onMessage(message);
         } catch (RuntimeException ignored) {
         }
 
-        verify(paymentRepo).save(Mockito.argThat(p -> p.getState() == PaymentState.FAILED));
+        assertEquals(PaymentState.CAPTURING, states.get(0));
+        assertEquals(PaymentState.FAILED, states.get(1));
         verify(compensation).releaseHoldAfterFailure(accountId, paymentId);
         verify(billerInvoiceClient, never()).markPaid(any());
         verify(processedEventRepo, never()).save(any(ProcessedEvent.class));
@@ -175,6 +193,7 @@ class StatusConsumerTest {
                 .thenReturn(new AccountResponse(accountId, "cust-123", "900000001", null, null, null, "CAD",
                         null, null, new BigDecimal("50.00"), null, 1, null, null));
         Mockito.doThrow(new RuntimeException("biller down")).when(billerInvoiceClient).markPaid(invoiceId);
+        List<PaymentState> states = recordSaveStates();
 
         try {
             consumer.onMessage(message);
@@ -185,8 +204,51 @@ class StatusConsumerTest {
                 any(PostingRequest.class));
         verify(billerInvoiceClient).markPaid(invoiceId);
         verify(compensation, never()).releaseHoldAfterFailure(any(), any());
-        verify(paymentRepo, never()).save(Mockito.argThat(p -> p.getState() == PaymentState.FAILED));
+        assertEquals(PaymentState.CAPTURING, states.get(0));
+        assertEquals(PaymentState.RECONCILIATION_REQUIRED, states.get(states.size() - 1));
         verify(processedEventRepo, never()).save(any(ProcessedEvent.class));
+    }
+
+    @Test
+    void postedFromSubmittedShouldCaptureAndPost() throws Exception {
+        UUID paymentId = UUID.randomUUID();
+        UUID accountId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID invoiceId = UUID.randomUUID();
+
+        Payment payment = Payment.builder()
+                .paymentId(paymentId)
+                .debtorAccountId(accountId)
+                .invoiceReference(invoiceId.toString())
+                .amountValue(new BigDecimal("50.00"))
+                .amountCcy("CAD")
+                .executionDate(LocalDate.now())
+                .state(PaymentState.SUBMITTED)
+                .batchId(UUID.randomUUID())
+                .reason("ok")
+                .idempotencyKey("idem-submitted")
+                .build();
+
+        BillpayStatusEvent event = new BillpayStatusEvent(eventId, paymentId, UUID.randomUUID(), "POSTED", "ok",
+                OffsetDateTime.now());
+        String message = objectMapper.writeValueAsString(event);
+
+        when(processedEventRepo.existsByHandlerAndEventId("status", eventId.toString())).thenReturn(false);
+        when(paymentRepo.findById(paymentId)).thenReturn(Optional.of(payment), Optional.of(payment), Optional.of(payment));
+        when(accountM2MClient.captureHoldAndDebit(eq(accountId), eq(paymentId), eq(paymentId + ":DEBIT"),
+                any(PostingRequest.class)))
+                .thenReturn(new AccountResponse(accountId, "cust-123", "900000001", null, null, null, "CAD",
+                        null, null, new BigDecimal("50.00"), null, 1, null, null));
+        List<PaymentState> states = recordSaveStates();
+
+        consumer.onMessage(message);
+
+        assertEquals(PaymentState.CAPTURING, states.get(0));
+        assertEquals(PaymentState.POSTED, states.get(states.size() - 1));
+        verify(accountM2MClient).captureHoldAndDebit(eq(accountId), eq(paymentId), eq(paymentId + ":DEBIT"),
+                any(PostingRequest.class));
+        verify(billerInvoiceClient).markPaid(invoiceId);
+        verify(processedEventRepo).save(any(ProcessedEvent.class));
     }
 
     @Test

@@ -10,61 +10,42 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * JwtToAuthConverter is responsible for converting a validated {@link Jwt} access token
- * into a Spring Security {@link AbstractAuthenticationToken} with proper authorities.
- *
- * <p>Spring Security uses these authorities to enforce method-level access control,
- * such as with {@code @PreAuthorize("hasAuthority('SCOPE_fdx:accounts.read')")}.</p>
- *
- * <p>This converter reads two sources of authority information from the token:</p>
- * <ul>
- *   <li><b>permissions</b> – an array claim on the access token.</li>
- *   <li><b>scope</b> – a space-delimited string of OAuth2 scopes.</li>
- * </ul>
- *
- * <p>It then normalizes both into the Spring Security authority format:
- * <code>SCOPE_{permission_or_scope}</code>.</p>
+ * Converter chuyển đổi JWT từ Auth0 thành Spring Security AbstractAuthenticationToken.
+ * Bóc tách `permissions` (RBAC) và `scope` để tạo danh sách authority với prefix `SCOPE_`,
+ * hỗ trợ phân quyền bằng `@PreAuthorize("hasAuthority('SCOPE_...')")`.
  */
 @Component
 public class JwtToAuthConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
     /**
-     * Converts a decoded JWT into a Spring {@link JwtAuthenticationToken} with authorities.
-     * This is automatically invoked by Spring Security during request processing.
-     *
-     * @param jwt the validated JWT access token from Auth0
-     * @return a {@link JwtAuthenticationToken} containing authorities derived from permissions and scopes
+     * Chuyển đổi JWT decode thành JwtAuthenticationToken.
+     * Được gọi tự động bởi Spring Security.
      */
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
 
-        // We'll collect all authorities (permissions + scopes) here
         Set<String> scopes = new LinkedHashSet<>();
 
-        // 1. Extract permissions claim (Auth0 adds this when RBAC is enabled)
+        // 1. Trích xuất claim permissions (được Auth0 thêm vào khi bật RBAC)
         Object perms = jwt.getClaims().get("permissions");
         if (perms instanceof Collection<?>) {
             for (Object p : (Collection<?>) perms) {
-                // Convert each permission to a string and add to our set
                 scopes.add(String.valueOf(p));
             }
         }
 
-        // 2. Extract OAuth2 "scope" claim (space-delimited)
+        // 2. Trích xuất claim scope (ngăn cách bởi dấu cách)
         String scope = jwt.getClaimAsString("scope");
         if (scope != null && !scope.isBlank()) {
-            // Split the space-delimited scopes and add each one
             scopes.addAll(Arrays.asList(scope.split(" ")));
         }
 
-        // 3. Convert all collected scopes/permissions into GrantedAuthority objects
+        // 3. Chuyển đổi thành Spring authorities với prefix SCOPE_
         List<GrantedAuthority> authorities = new ArrayList<>();
         for (final String s : scopes) {
-            // Spring convention: prefix each authority with "SCOPE_"
             authorities.add(() -> "SCOPE_" + s);
         }
 
-        // 4. Return a JwtAuthenticationToken with the original JWT and the derived authorities
         return new JwtAuthenticationToken(jwt, authorities);
     }
 }

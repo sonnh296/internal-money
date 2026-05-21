@@ -7,5 +7,9 @@ public enum PaymentState {
   BATCHED,
   SUBMITTED,
   POSTED,
-  FAILED
+  FAILED,
+  /**
+   * Đã capture/debit nhưng chưa cập nhật invoice — cần reconciliation, không release hold.
+   */
+  RECONCILIATION_REQUIRED
 }

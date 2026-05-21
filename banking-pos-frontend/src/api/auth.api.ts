@@ -1,21 +1,33 @@
+import type { PortalKind } from '../types/api.types'
+import { env } from '../config/env'
 import { getClient } from './httpClient'
 
 const client = getClient('auth')
 
-export function loginApi(payload: { email: string; password: string }) {
-  return client.post('/api/v1/auth/login', payload)
+function portalHeaders(portal: PortalKind): Record<string, string> {
+  return { 'X-Portal': portal }
 }
 
-export function refreshApi(refreshToken: string) {
-  return client.post('/api/v1/auth/refresh', { refresh_token: refreshToken })
+export function loginApi(payload: { email: string; password: string }, portal: PortalKind = 'user') {
+  return client.post('/api/v1/auth/login', payload, { headers: portalHeaders(portal) })
 }
 
-export function logoutApi(refreshToken: string) {
-  return client.post('/api/v1/auth/logout', { refresh_token: refreshToken })
+export function refreshApi(refreshToken: string, portal: PortalKind = 'user') {
+  const body = env.useAuthCookies && !refreshToken ? {} : { refresh_token: refreshToken }
+  return client.post('/api/v1/auth/refresh', body, { headers: portalHeaders(portal) })
 }
 
-export function changePasswordApi(payload: { currentPassword: string; newPassword: string }) {
-  return client.post('/api/v1/auth/change-password', payload)
+export function logoutApi(refreshToken: string, portal: PortalKind = 'user') {
+  const body = env.useAuthCookies && !refreshToken ? {} : { refresh_token: refreshToken }
+  return client.post('/api/v1/auth/logout', body, { headers: portalHeaders(portal) })
+}
+
+export function meApi(portal: PortalKind = 'user') {
+  return client.get('/api/v1/auth/me', { headers: portalHeaders(portal) })
+}
+
+export function changePasswordApi(payload: { currentPassword: string; newPassword: string }, portal: PortalKind = 'user') {
+  return client.post('/api/v1/auth/change-password', payload, { headers: portalHeaders(portal) })
 }
 
 export function testPublicApi() {

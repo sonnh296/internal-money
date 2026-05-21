@@ -45,10 +45,17 @@ public class EnqueuedConsumer {
 
     Payment p = paymentRepo.findById(evt.getPaymentId()).orElse(null);
     if (p != null) {
-      p.setState(PaymentState.BATCHED);
-      p.setBatchId(evt.getBatchId());
-      p.setUpdatedAt(OffsetDateTime.now());
-      paymentRepo.save(p);
+      if (PaymentStateTransitions.applyBatched(p, evt.getBatchId())) {
+        p.setUpdatedAt(OffsetDateTime.now());
+        paymentRepo.save(p);
+      } else {
+        log.info("Bỏ qua enqueued — không hạ state paymentId={} current={}",
+            p.getPaymentId(), p.getState());
+        if (p.getBatchId() == null && evt.getBatchId() != null) {
+          p.setBatchId(evt.getBatchId());
+          paymentRepo.save(p);
+        }
+      }
     }
 
     processed.save(ProcessedEvent.builder()

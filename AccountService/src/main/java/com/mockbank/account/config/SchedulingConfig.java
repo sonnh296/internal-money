@@ -28,6 +28,8 @@ public class SchedulingConfig {
             log.info("Auto-expiring {} holds (<= {})", toExpire.size(), now);
         }
 
+        // Hold BILLPAY: PaymentOrchestrator (PaymentStaleFundsHeldRecoveryJob) FAILED + releaseHold.
+        // Không EXPIRED tại đây — tránh payment FUNDS_HELD nhưng hold đã hết (lệch trạng thái).
         toExpire.forEach(h -> {
             if (h.getReason() != null && "BILLPAY".equalsIgnoreCase(h.getReason().trim())) {
                 return;

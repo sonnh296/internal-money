@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -12,8 +13,15 @@ import org.springframework.security.web.SecurityFilterChain;
 public class AuthUserSecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public com.mockbank.commons.security.CookieBearerFilter cookieBearerFilter() {
+        return new com.mockbank.commons.security.CookieBearerFilter();
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, com.mockbank.commons.security.CookieBearerFilter cookieBearerFilter)
+            throws Exception {
         http
+            .addFilterBefore(cookieBearerFilter, BearerTokenAuthenticationFilter.class)
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth

@@ -106,6 +106,9 @@ public class SettlementProcessor {
 
         if (settlement.getRetryCount() < MAX_RETRIES) {
             int nextAttempt = settlement.getRetryCount() + 1;
+            settlement.setRetryCount(nextAttempt);
+            settlement.setUpdatedAt(OffsetDateTime.now());
+            settlementRepo.save(settlement);
 
             BillBatchRetryEvent retryEvent = new BillBatchRetryEvent(
                     batchId,

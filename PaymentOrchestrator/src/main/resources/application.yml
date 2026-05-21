@@ -80,9 +80,16 @@ spring:
             readTimeout: 10000
 
 payments:
+  # Chỉ bật khi chạy local không có SettlementService — tránh duplicate pain.002 consumer
+  pain002-bridge:
+    enabled: ${PAYMENTS_PAIN002_BRIDGE_ENABLED:false}
   recovery:
     capturing-timeout-minutes: 30
+    # Sau placeHold — saga kẹt FUNDS_HELD (hold BILLPAY releaseAt 15p, job AccountService không expire BILLPAY)
+    stale-funds-held-timeout-minutes: 20
+    stale-in-flight-timeout-minutes: 120
     fixed-delay-ms: 300000
+    reconciliation-delay-ms: 60000
   topics:
     billpay-requested: billpay.requested
     billpay-enqueued: billpay.enqueued

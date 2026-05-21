@@ -1,1 +1,1 @@
-com.commons.exception.autoconfig.CommonsExceptionAutoConfiguration
+com.mockbank.commons.dto.exception.autoconfig.CommonsExceptionAutoConfiguration

@@ -23,7 +23,7 @@
         <spring-cloud.version>2024.0.2</spring-cloud.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <flyway.version>10.10.0</flyway.version>
-        <resilience4j.version>2.4.0</resilience4j.version>
+        <resilience4j.version>2.2.0</resilience4j.version>
         <commons-codec.version>1.17.0</commons-codec.version>
         <postgresql.version>42.7.3</postgresql.version>
     </properties>

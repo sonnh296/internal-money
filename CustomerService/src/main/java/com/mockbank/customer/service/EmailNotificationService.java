@@ -110,7 +110,8 @@ public class EmailNotificationService {
             sender.send(message);
             log.info("Email successfully sent to {}", to);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to send email notification.", e);
+            log.error("SMTP send failed. To={}, enabled={}, cause={}", to, mailEnabled, e.getMessage(), e);
+            throw new IllegalStateException("Failed to send email notification: " + e.getMessage(), e);
         }
     }
 }

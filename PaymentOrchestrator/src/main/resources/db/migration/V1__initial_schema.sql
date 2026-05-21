@@ -25,7 +25,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_state    ON payments (state);
 CREATE TABLE IF NOT EXISTS outbox (
     id           BIGSERIAL    PRIMARY KEY,
     topic        VARCHAR(120) NOT NULL,
-    message_key  VARCHAR(255) NOT NULL,
+    message_key  UUID NOT NULL,
     payload_json TEXT         NOT NULL,
     state        VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),

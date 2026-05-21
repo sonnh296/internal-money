@@ -9,27 +9,17 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.util.List;
 
 /**
- * Default security configuration that turns this Spring Boot microservice
- * into an OAuth2 Resource Server.
- *
- * <p>This class ensures that every incoming request with a Bearer token is:</p>
- * <ul>
- *   <li>Verified against the issuer JWKS (RS256 signature verification)</li>
- *   <li>Checked for correct issuer ({@code iss} claim)</li>
- *   <li>Checked for correct audience ({@code aud} claim)</li>
- *   <li>Converted into Spring Security authorities (so @PreAuthorize annotations work)</li>
- * </ul>
- *
- * <p>By doing this inside each microservice, we follow a <b>zero-trust</b> model —
- * every service independently validates tokens and does not rely on a gateway to do it.</p>
+ * Cấu hình Security cho Microservice đóng vai trò là OAuth2 Resource Server.
+ * Áp dụng mô hình zero-trust: mỗi service tự xác thực token thay vì phụ thuộc API Gateway.
  */
 @Configuration
-@EnableMethodSecurity // Enables method-level security (e.g., @PreAuthorize) in controllers and services
+@EnableMethodSecurity
 public class DefaultSecurityConfig {
 
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
@@ -38,31 +28,21 @@ public class DefaultSecurityConfig {
     @Value("${auth.jwt.audience}")
     private String audience;
 
-    /**
-     * Defines the Spring Security filter chain.
-     * This method configures the core security behavior for the microservice:
-     * - Disable CSRF (not needed for stateless REST APIs)
-     * - Make the service stateless (no HTTP sessions)
-     * - Define which endpoints are public vs. protected
-     * - Enable OAuth2 Resource Server mode to validate JWT access tokens
-     */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtToAuthConverter jwtToAuthConverter) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtToAuthConverter jwtToAuthConverter,
+            CookieBearerFilter cookieBearerFilter) throws Exception {
         http
-            // Disable CSRF since we're using stateless JWTs and not browser sessions
+            .addFilterBefore(cookieBearerFilter, BearerTokenAuthenticationFilter.class)
             .csrf(cs -> cs.disable())
-
-            // Ensure the service is stateless — no JSESSIONID cookies or server-side sessions
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-            // Authorization rules for HTTP requests
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints — no JWT required
                 .requestMatchers(
-                    "/actuator/health",       // Health check for monitoring
-                    "/api/v1/health",         // API-specific health endpoint
+                    "/actuator/health",
+                    "/api/v1/health",
                     "/api/v1/customers/health",
-                    "/api/v1/customer/register", // Public endpoint to register new customers
+                    "/api/v1/customer/register",
                     "/.well-known/jwks.json",
                     "/.well-known/openid-configuration",
                     "/api/v1/test/public",
@@ -72,17 +52,11 @@ public class DefaultSecurityConfig {
                 ).permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/customers").permitAll()
 
-                // Everything else requires a valid JWT access token
                 .anyRequest().authenticated()
             )
-
-            // Enable OAuth2 Resource Server mode with JWT validation
             .oauth2ResourceServer(oauth -> oauth
                 .jwt(jwt -> jwt
-                    // Configure how tokens are decoded and verified
                     .decoder(jwtDecoder())
-
-                    // Convert JWT claims (permissions, scopes) into Spring authorities
                     .jwtAuthenticationConverter(jwtToAuthConverter)
                 )
             );
@@ -91,40 +65,31 @@ public class DefaultSecurityConfig {
     }
 
     @Bean
+    public CookieBearerFilter cookieBearerFilter() {
+        return new CookieBearerFilter();
+    }
+
+    @Bean
     public JwtToAuthConverter jwtToAuthConverter() {
         return new JwtToAuthConverter();
     }
 
-    /**
-     * Configures a {@link JwtDecoder} that:
-     * - Downloads JWKS from the configured issuer
-     * - Verifies the RS256 signature of incoming tokens
-     * - Validates that the token's issuer (`iss`) matches the configured issuer
-     * - Validates that the token's audience (`aud`) includes your API identifier
-     *
-     * @return a configured {@link JwtDecoder}
-     */
     @Bean
     public JwtDecoder jwtDecoder() {
-        // Build a NimbusJwtDecoder using the issuer URL (it will auto-discover JWKS keys)
         NimbusJwtDecoder dec = (NimbusJwtDecoder) JwtDecoders.fromIssuerLocation(issuer);
-
-        // Validator 1: Ensure the issuer (iss) claim matches our tenant
         OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(issuer);
 
-        // Validator 2: Ensure the audience (aud) claim contains our API identifier
+        // Đảm bảo audience match với API của hệ thống
         OAuth2TokenValidator<Jwt> withAudience = token -> {
             Object aud = token.getClaims().get("aud");
             if (aud instanceof List && ((List<?>) aud).contains(audience)) {
                 return OAuth2TokenValidatorResult.success();
             }
-            // Reject tokens missing or having the wrong audience
             return OAuth2TokenValidatorResult.failure(
                 new OAuth2Error("invalid_token", "missing/invalid audience", null)
             );
         };
 
-        // Combine both validators (issuer AND audience must pass)
         dec.setJwtValidator(new DelegatingOAuth2TokenValidator<>(withIssuer, withAudience));
 
         return dec;

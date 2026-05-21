@@ -1,0 +1,11 @@
+# Copy thành application-dev-local.yml (đã gitignore) và điền Gmail App Password.
+spring:
+  mail:
+    username: your@gmail.com
+    # Gmail App Password: giữ nguyên 4 nhóm có dấu cách (vd. abcd efgh ijkl mnop)
+    password: "your app password"
+
+app:
+  mail:
+    from: your@gmail.com
+    enabled: true
